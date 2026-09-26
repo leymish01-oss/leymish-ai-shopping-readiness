@@ -1,0 +1,20 @@
+.lasr-wrap { max-width: 1100px; }
+.lasr-lede { font-size: 14px; max-width: 70ch; }
+.lasr-run { margin: 16px 0 24px; }
+.lasr-score { display: inline-flex; align-items: baseline; gap: 16px; padding: 16px 22px; border-radius: 10px; background: #fff; border: 1px solid #dcdcde; margin-bottom: 8px; }
+.lasr-number { font-size: 48px; font-weight: 700; line-height: 1; }
+.lasr-number span { font-size: 18px; color: #646970; font-weight: 400; }
+.lasr-band-good .lasr-number { color: #1a7f37; }
+.lasr-band-fair .lasr-number { color: #9a6700; }
+.lasr-band-poor .lasr-number { color: #b32d2e; }
+.lasr-when { color: #646970; }
+.lasr-fixes li { margin-bottom: 12px; max-width: 80ch; }
+.lasr-gain { color: #1a7f37; font-weight: 600; margin-left: 6px; }
+.lasr-detail { color: #50575e; }
+.lasr-table { margin: 8px 0 20px; }
+.lasr-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.lasr-pass { background: #e6f4ea; color: #1a7f37; }
+.lasr-warn { background: #fff4e0; color: #9a6700; }
+.lasr-fail { background: #fbeaea; color: #b32d2e; }
+.lasr-info, .lasr-skip { background: #f0f0f1; color: #50575e; }
+.lasr-pro { margin-top: 28px; padding: 10px 14px; background: #f6f7f7; border-left: 3px solid #2271b1; max-width: 80ch; }
