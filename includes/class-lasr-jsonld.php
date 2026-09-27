@@ -15,6 +15,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 class LASR_JSONLD {
 
 	/**
+	 * Whether a response body starts with a UTF-8 byte-order mark. JSON must not have one (RFC 8259
+	 * section 8.1), and strict parsers used by AI agents reject it. A BOM before every response usually
+	 * means a PHP file in the theme or a plugin was saved as "UTF-8 with BOM".
+	 *
+	 * @param string $body Response body.
+	 * @return bool
+	 */
+	public static function has_bom( $body ) {
+		return 0 === strncmp( (string) $body, "\xEF\xBB\xBF", 3 );
+	}
+
+	/**
 	 * Find every Product node in the page's JSON-LD blocks (including inside @graph).
 	 *
 	 * @param string $html Page HTML.

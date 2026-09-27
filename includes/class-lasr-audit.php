@@ -725,8 +725,32 @@ class LASR_Audit {
 		if ( 0 === $res['code'] ) {
 			return self::skipped( 'store_api', $label, $res['error'] );
 		}
-		$data = json_decode( $res['body'], true );
+		$bom  = LASR_JSONLD::has_bom( $res['body'] );
+		$data = json_decode( $bom ? substr( $res['body'], 3 ) : $res['body'], true );
 		$good = $res['ok'] && is_array( $data );
+		if ( $good && $bom ) {
+			return self::check(
+				'store_api',
+				$label,
+				'warn',
+				0.5,
+				__( 'The Store API answers, but every response starts with an invisible byte-order mark (BOM). Browsers ignore it; strict JSON parsers, which many AI agents and feed tools use, reject the response.', 'leymish-ai-shopping-readiness' ),
+				__( 'A PHP file in your theme or a plugin was saved as "UTF-8 with BOM". Re-save it as UTF-8 without BOM. To find it, open each custom PHP file\'s URL directly: files that stop early print nothing, so the one with the BOM returns exactly 3 bytes.', 'leymish-ai-shopping-readiness' ),
+				2
+			);
+		}
+		if ( $res['ok'] && ! $good ) {
+			return self::check(
+				'store_api',
+				$label,
+				'fail',
+				0,
+				/* translators: %d: HTTP status code. */
+				sprintf( __( 'The Store API answered HTTP %d, but not with JSON.', 'leymish-ai-shopping-readiness' ), $res['code'] ),
+				__( 'Something is adding output to REST responses (a PHP notice, whitespace or HTML from a theme or plugin). Turn off display_errors on the live site and check recently changed plugins.', 'leymish-ai-shopping-readiness' ),
+				2
+			);
+		}
 		return self::check(
 			'store_api',
 			$label,
