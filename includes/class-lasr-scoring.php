@@ -72,6 +72,36 @@ class LASR_Scoring {
 	}
 
 	/**
+	 * Whether the optional Pro add-on has a tool for this check: the bulk GTIN/brand/MPN editor (product data and
+	 * the identifiers in structured data) and the llms.txt generator. Nothing else, so the link only appears
+	 * where Pro really helps.
+	 *
+	 * @param string $id Check id.
+	 * @return bool
+	 */
+	public static function pro_helps( $id ) {
+		return in_array( $id, array( 'catalog', 'jsonld', 'llms_txt' ), true );
+	}
+
+	/**
+	 * Plain-text summary a store owner can copy and share. Nothing is sent anywhere.
+	 *
+	 * @param int   $score  Score out of 100.
+	 * @param array $checks Check results.
+	 * @return string
+	 */
+	public static function share_text( $score, array $checks ) {
+		$top = array_slice( self::fix_list( $checks ), 0, 2 );
+		$gap = array();
+		foreach ( $top as $f ) {
+			$gap[] = $f['label'];
+		}
+		$text = sprintf( 'Our WooCommerce store scored %d/100 for AI shopping readiness', (int) $score );
+		$text .= $gap ? '. Biggest gaps: ' . implode( '; ', $gap ) . '.' : ', with nothing left to fix.';
+		return $text . ' Free check: https://www.leymish.com/woocommerce/';
+	}
+
+	/**
 	 * Status from a fraction earned.
 	 *
 	 * @param float $fraction 0..1.

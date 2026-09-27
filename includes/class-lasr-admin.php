@@ -177,12 +177,20 @@ class LASR_Admin {
 		echo '<div class="lasr-when">' . esc_html( sprintf( __( 'Last audit: %s', 'leymish-ai-shopping-readiness' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $result['ran_at'] ) ) ) . '</div>';
 		echo '</div>';
 
+		echo '<details class="lasr-share"><summary>' . esc_html__( 'Share your score', 'leymish-ai-shopping-readiness' ) . '</summary>';
+		echo '<p class="description">' . esc_html__( 'Copy this text to share it. The plugin doesn\'t send it anywhere.', 'leymish-ai-shopping-readiness' ) . '</p>';
+		echo '<textarea readonly rows="3" class="large-text" aria-label="' . esc_attr__( 'Shareable score text', 'leymish-ai-shopping-readiness' ) . '">' . esc_textarea( LASR_Scoring::share_text( (int) $result['score'], $result['checks'] ) ) . '</textarea></details>';
+
 		if ( $fixes ) {
 			echo '<h2>' . esc_html__( 'Fix these first', 'leymish-ai-shopping-readiness' ) . '</h2><ol class="lasr-fixes">';
 			foreach ( $fixes as $f ) {
 				/* translators: %s: points that fixing this would add. */
 				echo '<li><strong>' . esc_html( $f['label'] ) . '</strong> <span class="lasr-gain">' . esc_html( sprintf( __( '+%s points', 'leymish-ai-shopping-readiness' ), $f['lost'] ) ) . '</span><br />';
-				echo '<span class="lasr-detail">' . esc_html( $f['detail'] ) . '</span><br />' . esc_html( $f['fix'] ) . '</li>';
+				echo '<span class="lasr-detail">' . esc_html( $f['detail'] ) . '</span><br />' . esc_html( $f['fix'] );
+				if ( ! defined( 'LASR_PRO_VERSION' ) && LASR_Scoring::pro_helps( $f['id'] ) ) {
+					echo ' <a class="lasr-pro-link" href="https://www.leymish.com/woocommerce/pro.html" target="_blank" rel="noopener">' . esc_html__( 'Fix it faster with Pro', 'leymish-ai-shopping-readiness' ) . '</a>';
+				}
+				echo '</li>';
 			}
 			echo '</ol>';
 		} else {

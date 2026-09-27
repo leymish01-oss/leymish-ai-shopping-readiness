@@ -4,7 +4,7 @@ Tags: woocommerce, chatgpt, ai, gtin, structured data
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -73,6 +73,10 @@ The first 500 published products. Developers can change this with the `lasr_prod
 5. Pro add-on: product feed URLs, llms.txt, weekly email and score history.
 
 == Changelog ==
+
+= 1.0.2 =
+* "Share your score": a copyable summary of your score and the two biggest gaps. Nothing is sent anywhere.
+* The fix list links to the optional Pro add-on only next to the checks Pro has a tool for (product identifiers, structured data identifiers, llms.txt).
 
 = 1.0.1 =
 * The Store API check now spots a byte-order mark (BOM) before the JSON, which strict parsers reject, and says how to find the file. It used to report "Fail: HTTP 200" and blame a security plugin. Found on a real store.
