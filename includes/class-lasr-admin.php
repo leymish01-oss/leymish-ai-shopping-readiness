@@ -227,7 +227,7 @@ class LASR_Admin {
 				sprintf(
 					/* translators: %s: link to the Pro add-on page. */
 					__( 'Want to fix gaps faster? The optional Pro add-on adds a bulk editor for GTIN, brand and MPN, OpenAI and Google product feeds on your own domain, an llms.txt generator, a weekly re-audit email and score history. %s', 'leymish-ai-shopping-readiness' ),
-					'<a href="https://www.leymish.com/pro.html" target="_blank" rel="noopener">' . esc_html__( 'About Pro', 'leymish-ai-shopping-readiness' ) . '</a>'
+					'<a href="https://www.leymish.com/woocommerce/pro.html" target="_blank" rel="noopener">' . esc_html__( 'About Pro', 'leymish-ai-shopping-readiness' ) . '</a>'
 				)
 			) . '</p>';
 		}

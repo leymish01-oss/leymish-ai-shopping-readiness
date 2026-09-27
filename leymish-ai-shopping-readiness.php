@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:          LeyMish AI Shopping Readiness
- * Plugin URI:           https://www.leymish.com/
+ * Plugin URI:           https://www.leymish.com/woocommerce/
  * Description:          Checks whether AI shopping agents (ChatGPT, Claude, Perplexity, Google) can find, read and trust your WooCommerce products. A 0–100 score, a prioritised fix list and a CSV export. Runs entirely on your site.
  * Version:              1.0.0
  * Requires at least:    6.4

@@ -38,7 +38,7 @@ From the command line: `wp lasr audit` or `wp lasr audit --format=json`.
 
 ## Pro add-on
 
-An optional, separately sold [Pro add-on](https://www.leymish.com/pro.html) adds a bulk GTIN/brand/MPN
+An optional, separately sold [Pro add-on](https://www.leymish.com/woocommerce/pro.html) adds a bulk GTIN/brand/MPN
 editor, OpenAI and Google feeds on your own domain, an llms.txt generator, a weekly re-audit email and
 score history. This free plugin is complete on its own.
 
