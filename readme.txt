@@ -4,7 +4,7 @@ Tags: woocommerce, chatgpt, ai, gtin, structured data
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -73,6 +73,9 @@ The first 500 published products. Developers can change this with the `lasr_prod
 5. Pro add-on: product feed URLs, llms.txt, weekly email and score history.
 
 == Changelog ==
+
+= 1.0.3 =
+* The note about the optional Pro add-on now says how many of your products lack a valid GTIN, MPN or brand, instead of a feature list. No new requests, nothing sent anywhere.
 
 = 1.0.2 =
 * "Share your score": a copyable summary of your score and the two biggest gaps. Nothing is sent anywhere.

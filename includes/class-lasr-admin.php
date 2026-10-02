@@ -231,14 +231,42 @@ class LASR_Admin {
 		}
 
 		if ( ! defined( 'LASR_PRO_VERSION' ) ) {
-			echo '<p class="lasr-pro">' . wp_kses_post(
-				sprintf(
-					/* translators: %s: link to the Pro add-on page. */
-					__( 'Want to fix gaps faster? The optional Pro add-on adds a bulk editor for GTIN, brand and MPN, OpenAI and Google product feeds on your own domain, an llms.txt generator, a weekly re-audit email and score history. %s', 'leymish-ai-shopping-readiness' ),
-					'<a href="https://www.leymish.com/woocommerce/pro.html" target="_blank" rel="noopener">' . esc_html__( 'About Pro', 'leymish-ai-shopping-readiness' ) . '</a>'
-				)
-			) . '</p>';
+			$link = '<a href="https://www.leymish.com/woocommerce/pro.html" target="_blank" rel="noopener">' . esc_html__( 'About Pro', 'leymish-ai-shopping-readiness' ) . '</a>';
+			$gaps = self::identifier_gaps( $result['products'] );
+			if ( $gaps > 0 ) {
+				$text = sprintf(
+					/* translators: 1: number of products, 2: link to the Pro add-on page. */
+					_n(
+						'%1$d of your products has no valid GTIN, MPN or brand, so AI shopping agents cannot match it to a known product. The optional Pro add-on fixes these from one table, with GTIN check digits verified before saving. %2$s',
+						'%1$d of your products have no valid GTIN, MPN or brand, so AI shopping agents cannot match them to a known product. The optional Pro add-on fixes these from one table, with GTIN check digits verified before saving. %2$s',
+						$gaps,
+						'leymish-ai-shopping-readiness'
+					),
+					$gaps,
+					$link
+				);
+			} else {
+				/* translators: %s: link to the Pro add-on page. */
+				$text = sprintf( __( 'Want to keep it this way? The optional Pro add-on adds OpenAI and Google product feeds on your own domain, an llms.txt generator, a weekly re-audit email and score history. %s', 'leymish-ai-shopping-readiness' ), $link );
+			}
+			echo '<p class="lasr-pro">' . wp_kses_post( $text ) . '</p>';
 		}
 		echo '</div>';
+	}
+
+	/**
+	 * Products missing a valid identifier or a brand (what the Pro bulk editor fixes).
+	 *
+	 * @param array $products Audit product rows.
+	 * @return int
+	 */
+	public static function identifier_gaps( $products ) {
+		$n = 0;
+		foreach ( (array) $products as $p ) {
+			if ( ! empty( $p['missing'] ) && array_intersect( array( 'identifier', 'brand' ), (array) $p['missing'] ) ) {
+				$n++;
+			}
+		}
+		return $n;
 	}
 }
