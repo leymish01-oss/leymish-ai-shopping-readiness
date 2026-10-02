@@ -10,6 +10,9 @@ WooCommerce products, and tells you what to fix first. Free, GPL-2.0-or-later, r
 **WooCommerce → AI Readiness** gives you a 0–100 score, a fix list ordered by points, and a CSV of every
 product's gaps.
 
+Want a quick look before installing? The [free online check](https://www.leymish.com/woocommerce/check/) runs 5 of
+these checks from outside your store in about 10 seconds.
+
 ## What it checks
 
 | Area | Check |
