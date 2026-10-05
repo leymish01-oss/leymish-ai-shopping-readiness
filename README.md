@@ -1,8 +1,8 @@
 # LeyMish AI Shopping Readiness (WooCommerce plugin)
 
-![WordPress.org: approved](https://img.shields.io/badge/WordPress.org-approved-brightgreen) ![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-blue)
+[![WordPress.org plugin](https://img.shields.io/wordpress/plugin/v/leymish-ai-shopping-readiness?label=WordPress.org)](https://wordpress.org/plugins/leymish-ai-shopping-readiness/) ![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-blue)
 
-Approved for the WordPress.org plugin directory on 4 Oct 2026; the listing goes live shortly. Until then, install the zip from the [latest release](https://github.com/leymish01-oss/leymish-ai-shopping-readiness/releases/latest).
+Install it from the [WordPress.org plugin directory](https://wordpress.org/plugins/leymish-ai-shopping-readiness/) (Plugins → Add New → search "LeyMish AI Shopping Readiness"), or download the zip from the [latest release](https://github.com/leymish01-oss/leymish-ai-shopping-readiness/releases/latest).
 
 Checks whether AI shopping agents (ChatGPT, Claude, Perplexity, Google) can find, read and trust your
 WooCommerce products, and tells you what to fix first. Free, GPL-2.0-or-later, runs entirely on your site.
