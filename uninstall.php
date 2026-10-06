@@ -12,3 +12,4 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 delete_option( 'lasr_last_audit' );
 delete_option( 'lasr_history' );
 delete_option( 'lasr_baseline' );
+delete_option( 'lasr_review_asked' );

@@ -23,6 +23,7 @@ class LASR_Admin {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ), 60 );
 		add_action( 'admin_post_lasr_run_audit', array( __CLASS__, 'handle_run' ) );
 		add_action( 'admin_post_lasr_export_csv', array( __CLASS__, 'handle_csv' ) );
+		add_action( 'admin_post_lasr_review', array( __CLASS__, 'handle_review' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'styles' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( LASR_FILE ), array( __CLASS__, 'action_links' ) );
 	}
@@ -230,6 +231,9 @@ class LASR_Admin {
 		echo '<div class="lasr-when">' . esc_html( $text ) . '</div></div>';
 		self::run_form( true );
 		echo '</div>';
+		if ( self::review_due( $delta ) ) {
+			self::review_box();
+		}
 
 		echo '<h2>' . esc_html__( 'Score over time', 'leymish-ai-shopping-readiness' ) . '</h2>';
 		self::chart( $history );
@@ -288,6 +292,51 @@ class LASR_Admin {
 		 * @param array   $result   Last audit.
 		 */
 		do_action( 'lasr_impact_after', $history, $baseline, $result );
+	}
+
+	/**
+	 * The one review request: only on our own Impact tab, only after the score improved by 10 or more points, and
+	 * gone for good after either answer. No incentive, never a site-wide notice.
+	 *
+	 * @param int $delta Points gained since the first audit.
+	 * @return bool
+	 */
+	public static function review_due( $delta ) {
+		return (int) $delta >= 10 && ! get_option( self::REVIEW_OPTION );
+	}
+
+	const REVIEW_OPTION = 'lasr_review_asked';
+
+	/**
+	 * The box itself.
+	 */
+	private static function review_box() {
+		echo '<div class="lasr-review" role="region" aria-label="' . esc_attr__( 'Review request', 'leymish-ai-shopping-readiness' ) . '">';
+		echo '<p><strong>' . esc_html__( 'Your score went up by 10 points or more.', 'leymish-ai-shopping-readiness' ) . '</strong> ' . esc_html__( 'If the plugin helped, a short review on WordPress.org helps other store owners find it. We only ask once.', 'leymish-ai-shopping-readiness' ) . '</p>';
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		wp_nonce_field( 'lasr_review' );
+		echo '<input type="hidden" name="action" value="lasr_review" />';
+		echo '<button type="submit" name="answer" value="review" class="button button-primary">' . esc_html__( 'Leave a review', 'leymish-ai-shopping-readiness' ) . '</button> ';
+		echo '<button type="submit" name="answer" value="no" class="button">' . esc_html__( 'No thanks', 'leymish-ai-shopping-readiness' ) . '</button>';
+		echo '</form></div>';
+	}
+
+	/**
+	 * Either answer hides the request for good; "Leave a review" then opens the WordPress.org review form.
+	 */
+	public static function handle_review() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have permission to do that.', 'leymish-ai-shopping-readiness' ) );
+		}
+		check_admin_referer( 'lasr_review' );
+		update_option( self::REVIEW_OPTION, time(), false );
+		$answer = isset( $_POST['answer'] ) ? sanitize_key( wp_unslash( $_POST['answer'] ) ) : '';
+		if ( 'review' === $answer ) {
+			wp_redirect( 'https://wordpress.org/support/plugin/leymish-ai-shopping-readiness/reviews/#new-post' ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- fixed WordPress.org URL.
+			exit;
+		}
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::SLUG ) );
+		exit;
 	}
 
 	/**

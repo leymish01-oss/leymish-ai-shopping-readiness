@@ -32,6 +32,8 @@
 .lasr-broken { color: #b32d2e; }
 .lasr-then-now { max-width: 680px; }
 .lasr-run .description { margin-left: 8px; }
+.lasr-review { max-width: 680px; margin: 0 0 16px; padding: 12px 16px; background: #fff; border: 1px solid #dcdcde; border-left: 4px solid #2271b1; border-radius: 4px; }
+.lasr-review p { margin: 0 0 10px; }
 /* The chart scales down on phones; SVG text scales with it, so labels get bigger in SVG units to stay readable. */
 @media (max-width: 600px) {
 	.lasr-number { font-size: 36px; } .lasr-axis { font-size: 22px; } .lasr-dot { r: 6px; }

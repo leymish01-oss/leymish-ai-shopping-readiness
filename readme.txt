@@ -4,7 +4,7 @@ Tags: gtin, chatgpt, ai shopping, structured data, woocommerce seo
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -91,6 +91,9 @@ The first 500 published products. Developers can change this with the `lasr_prod
 6. Pro add-on: product feed URLs, llms.txt, weekly email and score history.
 
 == Changelog ==
+
+= 1.2.0 =
+* After your score has gone up by 10 points or more, the Impact tab asks once whether you'd leave a review on WordPress.org. Either answer hides it for good. It never appears anywhere else in your admin.
 
 = 1.1.0 =
 * New **Impact** tab (the first thing you see): score over time as a weekly chart, checks fixed since your first audit, products with a GTIN or MPN, a brand and image alt text then vs now, and the next three fixes. Snapshots are kept in your site's options only; nothing is sent anywhere. Sites updating from 1.0.x start from their last audit.
