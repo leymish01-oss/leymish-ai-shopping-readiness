@@ -4,8 +4,13 @@
 
 Install it from the [WordPress.org plugin directory](https://wordpress.org/plugins/leymish-ai-shopping-readiness/) (Plugins → Add New → search "LeyMish AI Shopping Readiness"), or download the zip from the [latest release](https://github.com/leymish01-oss/leymish-ai-shopping-readiness/releases/latest).
 
-Checks whether AI shopping agents (ChatGPT, Claude, Perplexity, Google) can find, read and trust your
-WooCommerce products, and tells you what to fix first. Free, GPL-2.0-or-later, runs entirely on your site.
+Finds what stops AI shopping agents (ChatGPT, Claude, Perplexity, Google) reading your WooCommerce store, and
+tells you what to fix first. Beyond robots.txt, it requests a product page as each AI crawler to catch firewall,
+CDN and security-plugin blocks, checks that the Store API answers with clean JSON (no byte-order mark in front),
+and lists every product's data gaps. In our [census of 100 WooCommerce stores](https://www.leymish.com/blog/woocommerce-ai-readiness-census.html),
+only 4 of 76 product pages had a GTIN or MPN that AI agents can match; on our partner store, working through
+the fix list took the score [from 77 to 96](https://www.leymish.com/woocommerce/case-study-mishbio.html).
+Free, GPL-2.0-or-later, runs entirely on your site.
 
 **WooCommerce → AI Readiness** gives you a 0–100 score, a fix list ordered by points, and a CSV of every
 product's gaps.

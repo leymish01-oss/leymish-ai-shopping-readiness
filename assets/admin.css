@@ -9,12 +9,33 @@
 .lasr-band-poor .lasr-number { color: #b32d2e; }
 .lasr-when { color: #646970; }
 .lasr-fixes li { margin-bottom: 12px; max-width: 80ch; }
-.lasr-gain { color: #1a7f37; font-weight: 600; margin-left: 6px; }
+.lasr-gain { color: #135e28; font-weight: 600; margin-left: 6px; }
 .lasr-detail { color: #50575e; }
 .lasr-table { margin: 8px 0 20px; }
 .lasr-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-.lasr-pass { background: #e6f4ea; color: #1a7f37; }
-.lasr-warn { background: #fff4e0; color: #9a6700; }
+.lasr-pass { background: #e6f4ea; color: #135e28; }
+.lasr-warn { background: #fff4e0; color: #7a5200; }
 .lasr-fail { background: #fbeaea; color: #b32d2e; }
 .lasr-info, .lasr-skip { background: #f0f0f1; color: #50575e; }
 .lasr-pro { margin-top: 28px; padding: 10px 14px; background: #f6f7f7; border-left: 3px solid #2271b1; max-width: 80ch; }
+.nav-tab-wrapper { margin-bottom: 16px; }
+.lasr-impact-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; }
+.lasr-impact-head .lasr-run { margin: 0; }
+.lasr-empty { max-width: 70ch; padding: 8px 0; }
+.lasr-chart { margin: 0 0 8px; max-width: 680px; }
+.lasr-chart svg { width: 100%; height: auto; background: #fff; border: 1px solid #dcdcde; border-radius: 8px; padding: 8px; box-sizing: border-box; }
+.lasr-grid { stroke: #dcdcde; stroke-width: 1; }
+.lasr-axis { fill: #50575e; font-size: 12px; }
+.lasr-line { fill: none; stroke: #2271b1; stroke-width: 2.5; }
+.lasr-dot { fill: #2271b1; }
+.lasr-fixed li::before { content: "\2713\00a0"; color: #135e28; font-weight: 700; }
+.lasr-broken { color: #b32d2e; }
+.lasr-then-now { max-width: 680px; }
+.lasr-run .description { margin-left: 8px; }
+/* The chart scales down on phones; SVG text scales with it, so labels get bigger in SVG units to stay readable. */
+@media (max-width: 600px) {
+	.lasr-number { font-size: 36px; } .lasr-axis { font-size: 22px; } .lasr-dot { r: 6px; }
+	.lasr-score { flex-wrap: wrap; max-width: 100%; box-sizing: border-box; }
+	.lasr-wrap .lasr-table { display: block; overflow-x: auto; }
+	.lasr-share textarea { max-width: 100%; box-sizing: border-box; }
+}

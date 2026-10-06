@@ -110,10 +110,15 @@ class LASR_Audit {
 		$missing  = array_fill_keys( $fields, 0 );
 		$products = array();
 		$total    = 0.0;
+		$with_alt = 0; // main image has alt text (shown on the Impact tab; not scored)
 		foreach ( $ids as $id ) {
 			$product = wc_get_product( $id );
 			if ( ! $product ) {
 				continue;
+			}
+			$image = $product->get_image_id();
+			if ( $image && '' !== trim( (string) get_post_meta( $image, '_wp_attachment_image_alt', true ) ) ) {
+				++$with_alt;
 			}
 			$row        = self::product_row( $product );
 			$products[] = $row;
@@ -158,9 +163,10 @@ class LASR_Audit {
 			'check'    => $check,
 			'products' => $products,
 			'summary'  => array(
-				'checked' => $n,
-				'limit'   => $limit,
-				'missing' => $missing,
+				'checked'  => $n,
+				'limit'    => $limit,
+				'missing'  => $missing,
+				'with_alt' => $with_alt,
 			),
 		);
 	}

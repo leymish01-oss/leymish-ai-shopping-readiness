@@ -1,14 +1,14 @@
 === LeyMish AI Shopping Readiness ===
 Contributors: leymish
-Tags: woocommerce, chatgpt, ai, gtin, structured data
+Tags: gtin, chatgpt, ai shopping, structured data, woocommerce seo
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.4
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Can ChatGPT, Claude, Perplexity and Google shopping agents find and read your WooCommerce products? Get a 0–100 score and a prioritised fix list.
+See if ChatGPT and AI shopping agents can read your WooCommerce store: a 0–100 score, a fix list, and what improved since you started.
 
 == Description ==
 
@@ -19,6 +19,7 @@ Shopify stores became visible in ChatGPT and other AI shopping assistants by def
 * A **0–100 score** and a **fix list** ordered by how many points each fix is worth.
 * A table of every check with what was found.
 * The **products with the most gaps**, plus a **CSV export** of every product's gaps.
+* An **Impact** tab: your score week by week, the checks you've fixed since you started, how many products now have a GTIN or MPN, a brand and image alt text compared with your first audit, and what to fix next. Stored on your site only.
 
 = What it checks =
 
@@ -48,6 +49,22 @@ Developers can also run `wp lasr audit` (add `--format=json` for machine-readabl
 
 == Frequently Asked Questions ==
 
+= Is it really free? =
+
+Yes. The audit, the fix list, the Impact tab and the CSV export are free and never limited. An optional, separately sold Pro add-on adds tools that do some of the fixing for you.
+
+= Does it send my store's data anywhere? =
+
+No. Everything runs on your own site. Its only web requests go to your own store's pages (for example robots.txt and a few product pages), to see what AI crawlers receive.
+
+= What does the Impact tab show? =
+
+Your score week by week, the checks you've fixed since your first audit, and how many products have a GTIN or MPN, a brand and image alt text compared with when you started. It's stored on your site only.
+
+= Will it slow down my store? =
+
+No. The audit runs only when you click the button in your admin, and the plugin adds nothing to your shop's pages.
+
 = Does this put my products in ChatGPT? =
 
 No plugin can guarantee that. OpenAI, Google and others decide what they show. This plugin tells you what stops AI agents reading and trusting your products, and how to fix it.
@@ -66,13 +83,23 @@ The first 500 published products. Developers can change this with the `lasr_prod
 
 == Screenshots ==
 
-1. The score and the fix list, ordered by points.
-2. Every check with what was found.
-3. Products with the most gaps, and the CSV export.
-4. Pro add-on: bulk editor for GTIN, brand and MPN.
-5. Pro add-on: product feed URLs, llms.txt, weekly email and score history.
+1. The Impact tab: your score week by week, the checks you fixed and your product data then vs now.
+2. The score and the fix list, ordered by points.
+3. Every check with what was found.
+4. Products with the most gaps, and the CSV export.
+5. Pro add-on: bulk editor for GTIN, brand and MPN.
+6. Pro add-on: product feed URLs, llms.txt, weekly email and score history.
 
 == Changelog ==
+
+= 1.1.0 =
+* New **Impact** tab (the first thing you see): score over time as a weekly chart, checks fixed since your first audit, products with a GTIN or MPN, a brand and image alt text then vs now, and the next three fixes. Snapshots are kept in your site's options only; nothing is sent anywhere. Sites updating from 1.0.x start from their last audit.
+* The audit tab is unchanged. "Run the audit" now confirms when it's finished.
+* Deleting the plugin also removes the Impact history.
+* Accessibility: darker green and amber text in badges and the fix list, so they meet WCAG AA contrast.
+
+= 1.0.5 =
+* Accessibility: darker green and amber text in badges and the fix list (WCAG AA contrast), and the score, tables and share box fit a phone screen. Styling only; no code changes.
 
 = 1.0.4 =
 * Readme: contributor is now the plugin owner's WordPress.org account (leymish). No code changes.

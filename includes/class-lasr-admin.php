@@ -73,7 +73,8 @@ class LASR_Admin {
 		}
 		check_admin_referer( 'lasr_run_audit' );
 		LASR_Audit::run();
-		wp_safe_redirect( admin_url( 'admin.php?page=' . self::SLUG . '&lasr_done=1' ) );
+		$tab = isset( $_POST['lasr_tab'] ) && 'audit' === sanitize_key( wp_unslash( $_POST['lasr_tab'] ) ) ? '&tab=audit' : '';
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::SLUG . $tab . '&lasr_done=1' ) );
 		exit;
 	}
 
@@ -147,26 +148,202 @@ class LASR_Admin {
 	}
 
 	/**
-	 * The page.
+	 * The page: Impact (default) and Audit tabs.
 	 */
 	public static function render() {
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
 			return;
 		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab switch.
+		$tab    = isset( $_GET['tab'] ) && 'audit' === sanitize_key( wp_unslash( $_GET['tab'] ) ) ? 'audit' : 'impact';
 		$result = LASR_Audit::last();
 		echo '<div class="wrap lasr-wrap">';
 		echo '<h1>' . esc_html__( 'AI Shopping Readiness', 'leymish-ai-shopping-readiness' ) . '</h1>';
-		echo '<p class="lasr-lede">' . esc_html__( 'Can ChatGPT, Claude, Perplexity and Google find, read and trust your products? This audit checks your product data and what AI crawlers actually receive from your store. It runs entirely on your site; nothing is sent anywhere.', 'leymish-ai-shopping-readiness' ) . '</p>';
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display-only flag set by our own redirect.
+		if ( isset( $_GET['lasr_done'] ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Audit finished.', 'leymish-ai-shopping-readiness' ) . '</p></div>';
+		}
+		$base = admin_url( 'admin.php?page=' . self::SLUG );
+		echo '<nav class="nav-tab-wrapper" aria-label="' . esc_attr__( 'AI Readiness sections', 'leymish-ai-shopping-readiness' ) . '">';
+		echo '<a href="' . esc_url( $base ) . '" class="nav-tab' . ( 'impact' === $tab ? ' nav-tab-active" aria-current="page' : '' ) . '">' . esc_html__( 'Impact', 'leymish-ai-shopping-readiness' ) . '</a>';
+		echo '<a href="' . esc_url( $base . '&tab=audit' ) . '" class="nav-tab' . ( 'audit' === $tab ? ' nav-tab-active" aria-current="page' : '' ) . '">' . esc_html__( 'Audit', 'leymish-ai-shopping-readiness' ) . '</a>';
+		echo '</nav>';
+		if ( 'impact' === $tab ) {
+			self::render_impact( $result );
+		} else {
+			self::render_audit( $result );
+		}
+		echo '</div>';
+	}
 
+	/**
+	 * The "Run the audit" form.
+	 *
+	 * @param bool   $again Whether an audit already exists.
+	 * @param string $tab   Tab to come back to.
+	 */
+	private static function run_form( $again, $tab = 'impact' ) {
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="lasr-run">';
 		wp_nonce_field( 'lasr_run_audit' );
-		echo '<input type="hidden" name="action" value="lasr_run_audit" />';
-		submit_button( $result ? __( 'Run the audit again', 'leymish-ai-shopping-readiness' ) : __( 'Run the audit', 'leymish-ai-shopping-readiness' ), 'primary', 'submit', false );
+		echo '<input type="hidden" name="action" value="lasr_run_audit" /><input type="hidden" name="lasr_tab" value="' . esc_attr( $tab ) . '" />';
+		submit_button( $again ? __( 'Run the audit again', 'leymish-ai-shopping-readiness' ) : __( 'Run the audit', 'leymish-ai-shopping-readiness' ), 'primary', 'submit', false );
 		echo ' <span class="description">' . esc_html__( 'Takes up to a minute: it requests a few of your own pages as each AI crawler would.', 'leymish-ai-shopping-readiness' ) . '</span>';
 		echo '</form>';
+	}
+
+	/**
+	 * Impact tab: score over time, what was fixed, product data then vs now, what to fix next.
+	 *
+	 * @param array|null $result Last audit.
+	 */
+	private static function render_impact( $result ) {
+		$history  = LASR_Impact::history();
+		$baseline = LASR_Impact::baseline();
+		if ( ! $result || ! $history || ! $baseline ) {
+			echo '<div class="lasr-empty"><h2>' . esc_html__( 'See what improves', 'leymish-ai-shopping-readiness' ) . '</h2>';
+			echo '<p>' . esc_html__( 'Run your first audit to set a starting point. After each change you make, run it again: this page shows your score over time, the checks you fixed and how much of your product data is complete. Everything is stored on this site only.', 'leymish-ai-shopping-readiness' ) . '</p>';
+			self::run_form( false );
+			echo '</div>';
+			return;
+		}
+		$current = end( $history );
+		$date    = get_option( 'date_format' );
+		$labels  = array();
+		foreach ( $result['checks'] as $c ) {
+			$labels[ $c['id'] ] = $c['label'];
+		}
+
+		echo '<div class="lasr-impact-head">';
+		echo '<div class="lasr-score lasr-band-' . esc_attr( LASR_Scoring::band( (int) $current['s'] ) ) . '"><div class="lasr-number">' . esc_html( (string) (int) $current['s'] ) . '<span>/100</span></div>';
+		$delta = (int) $current['s'] - (int) $baseline['s'];
+		if ( count( $history ) > 1 || $baseline['t'] !== $current['t'] ) {
+			if ( 0 === $delta ) {
+				/* translators: 1: starting score, 2: date of the first audit. */
+				$text = sprintf( __( 'Same score as when you started (%1$d on %2$s)', 'leymish-ai-shopping-readiness' ), (int) $baseline['s'], wp_date( $date, (int) $baseline['t'] ) );
+			} else {
+				/* translators: 1: change in points, e.g. +12, 2: starting score, 3: date of the first audit. */
+				$text = sprintf( __( '%1$s points since you started (%2$d on %3$s)', 'leymish-ai-shopping-readiness' ), ( $delta > 0 ? '+' : '' ) . $delta, (int) $baseline['s'], wp_date( $date, (int) $baseline['t'] ) );
+			}
+		} else {
+			$text = __( 'Your starting point. Make a fix, run the audit again, and the change shows here.', 'leymish-ai-shopping-readiness' );
+		}
+		echo '<div class="lasr-when">' . esc_html( $text ) . '</div></div>';
+		self::run_form( true );
+		echo '</div>';
+
+		echo '<h2>' . esc_html__( 'Score over time', 'leymish-ai-shopping-readiness' ) . '</h2>';
+		self::chart( $history );
+
+		$changes = LASR_Impact::changes( $baseline, $current );
+		echo '<h2>' . esc_html__( 'Fixed since you started', 'leymish-ai-shopping-readiness' ) . '</h2>';
+		if ( $changes['fixed'] ) {
+			echo '<ul class="lasr-fixed">';
+			foreach ( $changes['fixed'] as $id ) {
+				echo '<li>' . esc_html( isset( $labels[ $id ] ) ? $labels[ $id ] : $id ) . '</li>';
+			}
+			echo '</ul>';
+		} else {
+			echo '<p>' . esc_html__( 'No checks have moved from "needs work" to "pass" yet.', 'leymish-ai-shopping-readiness' ) . '</p>';
+		}
+		if ( $changes['broken'] ) {
+			echo '<p class="lasr-broken"><strong>' . esc_html__( 'Passed before, needs work now:', 'leymish-ai-shopping-readiness' ) . '</strong> ' . esc_html( implode( ', ', array_map( function ( $id ) use ( $labels ) {
+				return isset( $labels[ $id ] ) ? $labels[ $id ] : $id;
+			}, $changes['broken'] ) ) ) . '</p>';
+		}
+
+		echo '<h2>' . esc_html__( 'Product data', 'leymish-ai-shopping-readiness' ) . '</h2>';
+		$names = array(
+			'identifier' => __( 'Valid GTIN or MPN', 'leymish-ai-shopping-readiness' ),
+			'brand'      => __( 'Brand', 'leymish-ai-shopping-readiness' ),
+			'alt'        => __( 'Main image has alt text', 'leymish-ai-shopping-readiness' ),
+		);
+		echo '<table class="widefat striped lasr-table lasr-then-now"><thead><tr><th scope="col">' . esc_html__( 'Products with…', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col">' . esc_html__( 'When you started', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col">' . esc_html__( 'Now', 'leymish-ai-shopping-readiness' ) . '</th></tr></thead><tbody>';
+		foreach ( LASR_Impact::product_rows( $baseline, $current ) as $r ) {
+			$cell = function ( $count, $pct, $n ) {
+				/* translators: 1: products with the field, 2: products checked, 3: percentage. */
+				return null === $count ? __( 'not recorded', 'leymish-ai-shopping-readiness' ) : sprintf( __( '%1$d of %2$d (%3$d%%)', 'leymish-ai-shopping-readiness' ), $count, $n, $pct );
+			};
+			echo '<tr><th scope="row">' . esc_html( $names[ $r['key'] ] ) . '</th><td>' . esc_html( $cell( $r['then'], $r['then_pct'], (int) $baseline['n'] ) ) . '</td><td>' . esc_html( $cell( $r['now'], $r['now_pct'], (int) $current['n'] ) ) . '</td></tr>';
+		}
+		echo '</tbody></table>';
+
+		$fixes = array_slice( LASR_Scoring::fix_list( $result['checks'] ), 0, 3 );
+		echo '<h2>' . esc_html__( 'What to fix next', 'leymish-ai-shopping-readiness' ) . '</h2>';
+		if ( $fixes ) {
+			echo '<ol class="lasr-fixes">';
+			foreach ( $fixes as $f ) {
+				/* translators: %s: points that fixing this would add. */
+				echo '<li><strong>' . esc_html( $f['label'] ) . '</strong> <span class="lasr-gain">' . esc_html( sprintf( __( '+%s points', 'leymish-ai-shopping-readiness' ), $f['lost'] ) ) . '</span><br />' . esc_html( $f['fix'] ) . '</li>';
+			}
+			echo '</ol><p><a href="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG . '&tab=audit' ) ) . '">' . esc_html__( 'See every check and product in the audit', 'leymish-ai-shopping-readiness' ) . '</a></p>';
+		} else {
+			echo '<p><strong>' . esc_html__( 'Nothing to fix. Nice.', 'leymish-ai-shopping-readiness' ) . '</strong></p>';
+		}
+
+		/**
+		 * Lets add-ons (Pro) add their own Impact sections.
+		 *
+		 * @param array[] $history  Weekly snapshots, oldest first.
+		 * @param array   $baseline Install baseline.
+		 * @param array   $result   Last audit.
+		 */
+		do_action( 'lasr_impact_after', $history, $baseline, $result );
+	}
+
+	/**
+	 * Accessible inline SVG line chart of the score, with the numbers as a table for screen readers.
+	 *
+	 * @param array[] $history Snapshots, oldest first.
+	 */
+	public static function chart( array $history ) {
+		$w   = 600;
+		$h   = 160;
+		$pts = LASR_Impact::points( $history, $w, $h );
+		$fmt = get_option( 'date_format' );
+		$sum = array();
+		foreach ( $history as $s ) {
+			$sum[] = wp_date( $fmt, (int) $s['t'] ) . ': ' . (int) $s['s'];
+		}
+		echo '<figure class="lasr-chart"><svg viewBox="-44 -24 ' . esc_attr( (string) ( $w + 64 ) ) . ' ' . esc_attr( (string) ( $h + 60 ) ) . '" role="img" aria-labelledby="lasr-chart-t lasr-chart-d" focusable="false">';
+		echo '<title id="lasr-chart-t">' . esc_html__( 'Audit score over time', 'leymish-ai-shopping-readiness' ) . '</title>';
+		echo '<desc id="lasr-chart-d">' . esc_html( implode( '; ', $sum ) ) . '</desc>';
+		foreach ( array( 0, 50, 100 ) as $g ) {
+			$y = $h - $g / 100 * $h;
+			echo '<line class="lasr-grid" x1="0" x2="' . esc_attr( (string) $w ) . '" y1="' . esc_attr( (string) $y ) . '" y2="' . esc_attr( (string) $y ) . '" />';
+			echo '<text class="lasr-axis" x="-8" y="' . esc_attr( (string) ( $y + 4 ) ) . '" text-anchor="end">' . esc_html( (string) $g ) . '</text>';
+		}
+		if ( count( $pts ) > 1 ) {
+			echo '<polyline class="lasr-line" points="' . esc_attr( implode( ' ', array_map( function ( $p ) {
+				return $p[0] . ',' . $p[1];
+			}, $pts ) ) ) . '" />';
+		}
+		foreach ( $pts as $i => $p ) {
+			echo '<circle class="lasr-dot" cx="' . esc_attr( (string) $p[0] ) . '" cy="' . esc_attr( (string) $p[1] ) . '" r="4" />';
+		}
+		$first = reset( $history );
+		$last  = end( $history );
+		echo '<text class="lasr-axis" x="0" y="' . esc_attr( (string) ( $h + 24 ) ) . '">' . esc_html( wp_date( $fmt, (int) $first['t'] ) ) . '</text>';
+		if ( count( $history ) > 1 ) {
+			echo '<text class="lasr-axis" x="' . esc_attr( (string) $w ) . '" y="' . esc_attr( (string) ( $h + 24 ) ) . '" text-anchor="end">' . esc_html( wp_date( $fmt, (int) $last['t'] ) ) . '</text>';
+		}
+		echo '</svg><figcaption class="description">' . esc_html__( 'One point per week (the last audit of each week).', 'leymish-ai-shopping-readiness' ) . '</figcaption></figure>';
+		echo '<table class="screen-reader-text"><caption>' . esc_html__( 'Audit score by week', 'leymish-ai-shopping-readiness' ) . '</caption><tbody>';
+		foreach ( $history as $s ) {
+			echo '<tr><th scope="row">' . esc_html( wp_date( $fmt, (int) $s['t'] ) ) . '</th><td>' . esc_html( (string) (int) $s['s'] ) . '</td></tr>';
+		}
+		echo '</tbody></table>';
+	}
+
+	/**
+	 * Audit tab: the full result (unchanged from 1.0).
+	 *
+	 * @param array|null $result Last audit.
+	 */
+	private static function render_audit( $result ) {
+		echo '<p class="lasr-lede">' . esc_html__( 'Can ChatGPT, Claude, Perplexity and Google find, read and trust your products? This audit checks your product data and what AI crawlers actually receive from your store. It runs entirely on your site; nothing is sent anywhere.', 'leymish-ai-shopping-readiness' ) . '</p>';
+		self::run_form( (bool) $result, 'audit' );
 
 		if ( ! $result ) {
-			echo '</div>';
 			return;
 		}
 
@@ -251,7 +428,6 @@ class LASR_Admin {
 			}
 			echo '<p class="lasr-pro">' . wp_kses_post( $text ) . '</p>';
 		}
-		echo '</div>';
 	}
 
 	/**
