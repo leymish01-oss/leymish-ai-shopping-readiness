@@ -4,7 +4,7 @@ Tags: gtin, chatgpt, ai shopping, structured data, woocommerce seo
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -90,7 +90,42 @@ The first 500 published products. Developers can change this with the `lasr_prod
 5. Pro add-on: bulk editor for GTIN, brand and MPN.
 6. Pro add-on: product feed URLs, llms.txt, weekly email and score history.
 
+== External services ==
+
+The audit itself runs entirely on your own server: it requests your own pages the way an AI crawler would and
+scores what it finds. Nothing about your store is sent anywhere, and the plugin works with no internet
+connection beyond your own site.
+
+There is exactly one optional feature that contacts us, and only after you tick a box and press a button:
+
+**The weekly store tip (optional, off by default)**
+
+* What it is: on the AI Readiness screen there is an unticked checkbox offering a weekly email with one thing
+  to fix on a WooCommerce store, plus your latest readiness score.
+* When data is sent: only when you tick that box, enter an email address and submit the form. Never on
+  activation, never on an audit, never in the background.
+* What is sent: the email address you type, your site's domain name, and the fact that you consented (with the
+  exact wording you agreed to and the time). Nothing else. Your products, scores and audit results are not sent.
+* Where it goes: the LeyMish Labs service at https://leymish-ai.leymish.workers.dev/v1/check/subscribe, run by
+  LeyMish Labs (14 Jenkins St, Rosewater SA 5013, Australia).
+* What we do with it: send you those emails. The score in them comes from our free outside check of your
+  public pages (at most 6 requests a week, obeying your robots.txt), not from the plugin. We do not sell or
+  share your address. Every email has an unsubscribe link, and unsubscribing deletes the record.
+* Terms and privacy: https://www.leymish.com/terms.html and https://www.leymish.com/privacy.html
+
+The "try it on a sample store" link opens WordPress Playground (https://playground.wordpress.net), a service
+run by the WordPress project that builds a throwaway WordPress in your own browser. It is an ordinary link:
+following it sends nothing about your site, and nothing is installed here.
+
 == Changelog ==
+
+= 1.3.0 =
+* A three-step checklist on first run: run the audit, fix your top three, see Impact. It disappears once you have run an audit, and you can hide it at any time.
+* An optional weekly email with one store tip and your score. The checkbox is unticked; nothing is sent unless you tick it and submit. Every email has an unsubscribe link, and unsubscribing deletes the record. Disclosed in full under "External services" above.
+* A link to try the plugin on a throwaway sample store in your browser, via WordPress Playground.
+* The UCP check now validates the whole business profile — ucp.version, ucp.services and ucp.payment_handlers, reverse-domain capability names, https endpoints — and names the specification version it checked against.
+* New information-only line for ACP (the protocol behind ChatGPT checkout): whether this site has a checkout-session route, and which specification version is current. It is not scored, and we never probe your checkout from outside.
+
 
 = 1.2.0 =
 * After your score has gone up by 10 points or more, the Impact tab asks once whether you'd leave a review on WordPress.org. Either answer hides it for good. It never appears anywhere else in your admin.

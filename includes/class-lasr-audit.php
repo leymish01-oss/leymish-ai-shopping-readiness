@@ -57,6 +57,7 @@ class LASR_Audit {
 			self::check_llms_txt(),
 			self::check_guest_checkout(),
 			self::check_ucp(),
+			self::check_acp(),
 			self::check_mcp(),
 		);
 
@@ -812,29 +813,122 @@ class LASR_Audit {
 	}
 
 	/**
+	 * Agentic-commerce protocol versions we check against (P-023 §4.1).
+	 *
+	 * Both specs are Apache-2.0 and both move. Pinning the version we checked means a store owner can tell
+	 * whether a pass is still current, and we can tell which spec a past audit was judged by.
+	 *
+	 * - UCP, Universal Commerce Protocol (Google and others): https://ucp.dev — profile at /.well-known/ucp.
+	 * - ACP, Agentic Commerce Protocol (OpenAI and Stripe): https://agenticcommerce.dev — merchant REST API.
+	 *
+	 * @return array{ucp:string,acp:string,checked:string}
+	 */
+	private static function protocol_versions() {
+		return array(
+			'ucp'     => '2026-01-23',  // ucp.dev latest specification at the time of writing
+			'acp'     => '2026-04-17',  // latest stable spec folder in the ACP repository
+			'checked' => '2026-10-07',  // when we last read both specs
+		);
+	}
+
+	/**
 	 * A UCP business profile at /.well-known/ucp (ucp.dev).
+	 *
+	 * The spec requires a JSON object with a `ucp` member holding `version`, `services` and `payment_handlers`
+	 * — the last two must be present even when empty. `capabilities` is optional. Capability and service names
+	 * use reverse-domain naming (`dev.ucp.shopping.checkout`), each capability declares a `schema`, and an
+	 * `endpoint` must be https without a trailing slash. We check the shape, not the behaviour: a profile that
+	 * parses and carries the required members is the part a store owner controls.
 	 *
 	 * @return array
 	 */
 	private static function check_ucp() {
-		$label = __( 'UCP profile at /.well-known/ucp', 'leymish-ai-shopping-readiness' );
+		$v     = self::protocol_versions();
+		$label = __( 'UCP business profile at /.well-known/ucp', 'leymish-ai-shopping-readiness' );
 		$res   = self::get( home_url( '/.well-known/ucp' ) );
 		if ( 0 === $res['code'] ) {
 			return self::skipped( 'ucp', $label, $res['error'] );
 		}
-		$data  = json_decode( $res['body'], true );
-		$valid = $res['ok'] && is_array( $data ) && isset( $data['ucp']['version'] );
+		$data     = json_decode( $res['body'], true );
+		$ucp      = is_array( $data ) && isset( $data['ucp'] ) && is_array( $data['ucp'] ) ? $data['ucp'] : null;
+		$problems = array();
+
+		if ( ! $res['ok'] || null === $ucp ) {
+			$problems[] = __( 'no profile that parses as JSON with a "ucp" member', 'leymish-ai-shopping-readiness' );
+		} else {
+			foreach ( array( 'version', 'services', 'payment_handlers' ) as $required ) {
+				if ( ! isset( $ucp[ $required ] ) ) {
+					/* translators: %s: the missing field name. */
+					$problems[] = sprintf( __( 'ucp.%s is missing (it is required even when empty)', 'leymish-ai-shopping-readiness' ), $required );
+				}
+			}
+			foreach ( array_keys( isset( $ucp['capabilities'] ) && is_array( $ucp['capabilities'] ) ? $ucp['capabilities'] : array() ) as $name ) {
+				if ( ! preg_match( '/^[a-z0-9-]+(\.[a-z0-9_-]+){2,}$/', (string) $name ) ) {
+					/* translators: %s: the capability name that is not reverse-domain. */
+					$problems[] = sprintf( __( 'capability "%s" is not a reverse-domain name like dev.ucp.shopping.checkout', 'leymish-ai-shopping-readiness' ), sanitize_text_field( (string) $name ) );
+				}
+			}
+			foreach ( ( isset( $ucp['services'] ) && is_array( $ucp['services'] ) ? $ucp['services'] : array() ) as $service ) {
+				$endpoint = is_array( $service ) && isset( $service['endpoint'] ) ? (string) $service['endpoint'] : '';
+				if ( '' !== $endpoint && 0 !== strpos( $endpoint, 'https://' ) ) {
+					$problems[] = __( 'a service endpoint is not https', 'leymish-ai-shopping-readiness' );
+				} elseif ( '' !== $endpoint && '/' === substr( $endpoint, -1 ) ) {
+					$problems[] = __( 'a service endpoint ends in a slash (the spec says it should not)', 'leymish-ai-shopping-readiness' );
+				}
+			}
+		}
+
+		$valid   = empty( $problems );
+		$version = $valid && isset( $ucp['version'] ) ? sanitize_text_field( (string) $ucp['version'] ) : '';
 		return self::check(
 			'ucp',
 			$label,
 			$valid ? 'pass' : ( $res['ok'] ? 'warn' : 'fail' ),
 			$valid ? 1 : 0,
 			$valid
-				/* translators: %s: UCP version string. */
-				? sprintf( __( 'UCP profile found (version %s).', 'leymish-ai-shopping-readiness' ), sanitize_text_field( (string) $data['ucp']['version'] ) )
-				: __( 'No valid UCP profile. Few WooCommerce stores have one yet.', 'leymish-ai-shopping-readiness' ),
-			__( 'The Universal Commerce Protocol lets AI agents discover your checkout capabilities. It needs a checkout integration that implements UCP; no setting in WooCommerce core provides it yet. Worth watching, not urgent.', 'leymish-ai-shopping-readiness' ),
+				/* translators: 1: the store's UCP version, 2: the spec version we checked against. */
+				? sprintf( __( 'Valid UCP profile (version %1$s). Checked against the UCP specification of %2$s.', 'leymish-ai-shopping-readiness' ), $version, $v['ucp'] )
+				/* translators: 1: what is wrong, 2: the spec version we checked against. */
+				: sprintf( __( '%1$s. Checked against the UCP specification of %2$s. Few WooCommerce stores have a profile yet.', 'leymish-ai-shopping-readiness' ), implode( '; ', array_slice( $problems, 0, 3 ) ), $v['ucp'] ),
+			__( 'The Universal Commerce Protocol (ucp.dev, Apache-2.0) lets an AI agent discover what your checkout can do. The profile is a JSON file at /.well-known/ucp whose "ucp" member has version, services and payment_handlers. WooCommerce core does not publish one yet, so today it needs a checkout integration that implements UCP. Worth watching, not urgent.', 'leymish-ai-shopping-readiness' ),
 			3
+		);
+	}
+
+	/**
+	 * Agentic Commerce Protocol readiness: information only, doesn't affect the score.
+	 *
+	 * ACP (OpenAI and Stripe, Apache-2.0) is a merchant REST API: POST /checkout_sessions and friends, every
+	 * request authenticated and carrying an `API-Version` header. We deliberately do **not** probe it from
+	 * outside — it is authenticated, and firing unauthenticated POSTs at a stranger's checkout is not a thing
+	 * an audit should do. What we can honestly report from inside WordPress is whether anything on this site
+	 * has registered an ACP-shaped route, and what the current spec version is.
+	 *
+	 * @return array
+	 */
+	private static function check_acp() {
+		$v     = self::protocol_versions();
+		$found = array();
+		if ( function_exists( 'rest_get_server' ) ) {
+			foreach ( array_keys( (array) rest_get_server()->get_routes() ) as $route ) {
+				if ( false !== strpos( (string) $route, 'checkout_sessions' ) || false !== strpos( (string) $route, 'checkout-sessions' ) ) {
+					$found[] = (string) $route;
+				}
+			}
+		}
+		return array(
+			'id'     => 'acp',
+			'label'  => __( 'ACP checkout (ChatGPT Instant Checkout)', 'leymish-ai-shopping-readiness' ),
+			'status' => 'info',
+			'points' => 0,
+			'earned' => 0,
+			'detail' => $found
+				/* translators: 1: the route found, 2: the ACP spec version. */
+				? sprintf( __( 'A checkout-session route is registered (%1$s). ACP specification of %2$s. We do not test it: it is authenticated, so only you can.', 'leymish-ai-shopping-readiness' ), sanitize_text_field( $found[0] ), $v['acp'] )
+				/* translators: %s: the ACP spec version. */
+				: sprintf( __( 'No ACP checkout route on this site. The Agentic Commerce Protocol (specification of %s) is how ChatGPT completes a purchase on your store; today it comes from your payment provider, not from WooCommerce core.', 'leymish-ai-shopping-readiness' ), $v['acp'] ),
+			'fix'    => '',
+			'effort' => 3,
 		);
 	}
 

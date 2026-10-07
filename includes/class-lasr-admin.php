@@ -25,6 +25,7 @@ class LASR_Admin {
 		add_action( 'admin_post_lasr_export_csv', array( __CLASS__, 'handle_csv' ) );
 		add_action( 'admin_post_lasr_review', array( __CLASS__, 'handle_review' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'styles' ) );
+		LASR_Onboarding::init();
 		add_filter( 'plugin_action_links_' . plugin_basename( LASR_FILE ), array( __CLASS__, 'action_links' ) );
 	}
 
@@ -164,6 +165,8 @@ class LASR_Admin {
 		if ( isset( $_GET['lasr_done'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Audit finished.', 'leymish-ai-shopping-readiness' ) . '</p></div>';
 		}
+		LASR_Onboarding::notice();
+		LASR_Onboarding::render_checklist( $result );
 		$base = admin_url( 'admin.php?page=' . self::SLUG );
 		echo '<nav class="nav-tab-wrapper" aria-label="' . esc_attr__( 'AI Readiness sections', 'leymish-ai-shopping-readiness' ) . '">';
 		echo '<a href="' . esc_url( $base ) . '" class="nav-tab' . ( 'impact' === $tab ? ' nav-tab-active" aria-current="page' : '' ) . '">' . esc_html__( 'Impact', 'leymish-ai-shopping-readiness' ) . '</a>';
@@ -174,6 +177,7 @@ class LASR_Admin {
 		} else {
 			self::render_audit( $result );
 		}
+		LASR_Onboarding::render_optin();
 		echo '</div>';
 	}
 
