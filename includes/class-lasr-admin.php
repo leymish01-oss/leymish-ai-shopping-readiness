@@ -25,6 +25,8 @@ class LASR_Admin {
 		add_action( 'admin_post_lasr_export_csv', array( __CLASS__, 'handle_csv' ) );
 		add_action( 'admin_post_lasr_review', array( __CLASS__, 'handle_review' ) );
 		add_action( 'admin_post_lasr_dismiss_panel', array( 'LASR_Dashboard', 'handle_dismiss' ) );
+		add_action( 'admin_notices', array( __CLASS__, 'welcome_notice' ) );
+		add_action( 'admin_post_lasr_dismiss_welcome', array( __CLASS__, 'handle_dismiss_welcome' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'styles' ) );
 		LASR_Onboarding::init();
 		add_filter( 'plugin_action_links_' . plugin_basename( LASR_FILE ), array( __CLASS__, 'action_links' ) );
@@ -36,12 +38,41 @@ class LASR_Admin {
 	public static function menu() {
 		add_submenu_page(
 			'woocommerce',
-			__( 'AI Shopping Readiness', 'leymish-ai-shopping-readiness' ),
-			__( 'AI Readiness', 'leymish-ai-shopping-readiness' ),
+			__( 'LeyMish AI Readiness', 'leymish-ai-shopping-readiness' ),
+			__( 'LeyMish AI Readiness', 'leymish-ai-shopping-readiness' ),
 			'manage_woocommerce',
 			self::SLUG,
 			array( __CLASS__, 'render' )
 		);
+	}
+
+	const WELCOME_OPTION = 'lasr_welcome';
+
+	/**
+	 * One welcome notice on the Plugins screen after the first activation (a notice, not a redirect), until the
+	 * owner opens the page or dismisses it. Only on the Plugins screen, only for people who can use the plugin.
+	 */
+	public static function welcome_notice() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'plugins' !== $screen->id || ! get_option( self::WELCOME_OPTION ) || ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+		$dismiss = wp_nonce_url( admin_url( 'admin-post.php?action=lasr_dismiss_welcome' ), 'lasr_dismiss_welcome' );
+		echo '<div class="notice notice-info lasr-welcome"><p><strong>' . esc_html__( 'LeyMish AI Readiness is active.', 'leymish-ai-shopping-readiness' ) . '</strong> ' . esc_html__( 'Run your first audit to see whether AI shopping agents can read your store. It takes about a minute and runs on your site.', 'leymish-ai-shopping-readiness' ) . '</p>';
+		echo '<p><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG ) ) . '">' . esc_html__( 'Open LeyMish AI Readiness', 'leymish-ai-shopping-readiness' ) . '</a> <a class="button-link" href="' . esc_url( $dismiss ) . '">' . esc_html__( 'Dismiss', 'leymish-ai-shopping-readiness' ) . '</a></p></div>';
+	}
+
+	/**
+	 * Dismiss the welcome notice for good.
+	 */
+	public static function handle_dismiss_welcome() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have permission to do that.', 'leymish-ai-shopping-readiness' ) );
+		}
+		check_admin_referer( 'lasr_dismiss_welcome' );
+		delete_option( self::WELCOME_OPTION );
+		wp_safe_redirect( admin_url( 'plugins.php' ) );
+		exit;
 	}
 
 	/**
@@ -51,7 +82,7 @@ class LASR_Admin {
 	 * @return string[]
 	 */
 	public static function action_links( $links ) {
-		array_unshift( $links, '<a href="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG ) ) . '">' . esc_html__( 'Run audit', 'leymish-ai-shopping-readiness' ) . '</a>' );
+		array_unshift( $links, '<a href="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG ) ) . '">' . esc_html__( 'Open dashboard', 'leymish-ai-shopping-readiness' ) . '</a>' );
 		return $links;
 	}
 
@@ -161,7 +192,8 @@ class LASR_Admin {
 		$tab    = isset( $_GET['tab'] ) && 'audit' === sanitize_key( wp_unslash( $_GET['tab'] ) ) ? 'audit' : 'impact';
 		$result = LASR_Audit::last();
 		echo '<div class="wrap lasr-wrap">';
-		echo '<h1>' . esc_html__( 'AI Shopping Readiness', 'leymish-ai-shopping-readiness' ) . '</h1>';
+		delete_option( self::WELCOME_OPTION ); // they found the page: the Plugins-screen welcome has done its job
+		echo '<h1>' . esc_html__( 'LeyMish AI Readiness', 'leymish-ai-shopping-readiness' ) . '</h1>';
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display-only flag set by our own redirect.
 		if ( isset( $_GET['lasr_done'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Audit finished.', 'leymish-ai-shopping-readiness' ) . '</p></div>';

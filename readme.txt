@@ -4,7 +4,7 @@ Tags: gtin, chatgpt, ai shopping, structured data, woocommerce seo
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.4.0
+Stable tag: 1.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -118,6 +118,11 @@ run by the WordPress project that builds a throwaway WordPress in your own brows
 following it sends nothing about your site, and nothing is installed here.
 
 == Changelog ==
+
+= 1.4.1 =
+* The menu and page are now called "LeyMish AI Readiness".
+* "Open dashboard" is the first link on the plugin's row in the Plugins list.
+* After the first activation, one notice on the Plugins screen links straight to the dashboard. It goes away once you open the page or dismiss it.
 
 = 1.4.0 =
 * A clearer dashboard: a score gauge with a grade and one plain sentence about where your store stands, your trend, and four cards for Access, Product data, Store API and AI checkout readiness.
