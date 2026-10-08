@@ -1,4 +1,4 @@
-# LeyMish AI Shopping Readiness (WooCommerce plugin)
+# LeyMish AI Readiness (WooCommerce plugin)
 
 [![WordPress.org plugin](https://img.shields.io/wordpress/plugin/v/leymish-ai-shopping-readiness?label=WordPress.org)](https://wordpress.org/plugins/leymish-ai-shopping-readiness/) ![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-blue)
 
@@ -12,8 +12,10 @@ only 4 of 76 product pages had a GTIN or MPN that AI agents can match; on our pa
 the fix list took the score [from 77 to 96](https://www.leymish.com/woocommerce/case-study-mishbio.html).
 Free, GPL-2.0-or-later, runs entirely on your site.
 
-**WooCommerce → AI Readiness** gives you a 0–100 score, a fix list ordered by points, and a CSV of every
-product's gaps.
+One **LeyMish** menu with eight tabs: Overview (a 0–100 score, what's wrong, what was fixed, what to do next),
+Audit (every check with its fix, and a CSV), Products (an editor for GTIN, brand and MPN with one-click fixes, a
+preview and an undo, and "see it the way AI sees it"), Feeds (OpenAI and Google feeds, llms.txt, a UCP profile and
+richer product schema on your own domain), AI visibility, AI fixes, Team and Plan.
 
 Want a quick look before installing? The [free online check](https://www.leymish.com/woocommerce/check/) runs 5 of
 these checks from outside your store in about 10 seconds.
@@ -30,12 +32,12 @@ these checks from outside your store in about 10 seconds.
 | Commerce endpoints | Store API reachable, guest checkout on, llms.txt, UCP profile at `/.well-known/ucp` |
 | Info only | WooCommerce MCP availability (store-management assistants; not scored) |
 
-No outside services, no account, no tracking: the only HTTP requests go to your own store's URLs.
+Everything above runs on your own site; the audit's only HTTP requests go to your own store's URLs. Optional LeyMish services (AI visibility, AI fixes, outside monitoring, Store Team, the weekly tip) go through one class, `includes/class-lasr-service.php`, only after you act, and are listed under "External services" in `readme.txt`.
 
 ## Install
 
 Upload the `leymish-ai-shopping-readiness` folder to `wp-content/plugins/` (or install the zip from
-Plugins → Add New → Upload), activate it next to WooCommerce, then open **WooCommerce → AI Readiness**.
+Plugins → Add New → Upload), activate it next to WooCommerce, then open **LeyMish** in the admin menu.
 
 From the command line: `wp lasr audit` or `wp lasr audit --format=json`.
 
@@ -46,13 +48,14 @@ From the command line: `wp lasr audit` or `wp lasr audit --format=json`.
 - The full test suite (PHPUnit on PHP 7.4 and 8.3, an end-to-end run against WordPress + WooCommerce in
   wp-env, and Plugin Check) lives in the LeyMish Labs repo that builds this plugin.
 - Filters: `lasr_product_limit`, `lasr_gtin_meta_keys`, `lasr_mpn_meta_keys`, `lasr_brand_taxonomies`,
-  `lasr_request_url`, `lasr_sslverify`. Action: `lasr_audit_completed`.
+  `lasr_request_url`, `lasr_sslverify`, `lasr_ucp_profile` (a UCP checkout integration adds its services),
+  `lasr_service_base`. Action: `lasr_audit_completed`.
 
-## Pro add-on
+## LeyMish Pro
 
-An optional, separately sold [Pro add-on](https://www.leymish.com/woocommerce/pro.html) adds a bulk GTIN/brand/MPN
-editor, OpenAI and Google feeds on your own domain, an llms.txt generator, a weekly re-audit email and
-score history. This free plugin is complete on its own.
+Since 2.0 there is no separate add-on. [LeyMish Pro](https://www.leymish.com/woocommerce/pro.html) ($12 a month or
+$99 a year) is a set of services the plugin calls: weekly AI visibility checks, 500 AI fixes a month, outside
+monitoring and Store Team agents. Nothing that runs on your site is locked.
 
 ## License
 

@@ -1,6 +1,8 @@
 <?php
 /**
- * Admin screen: WooCommerce → AI Readiness.
+ * The one LeyMish screen (2.0): a top-level "LeyMish" menu right after WooCommerce, no submenus, and eight tabs:
+ * Overview, Audit, Products, Feeds, AI visibility, AI fixes, Team, Plan. Every tab opens with the same three answers:
+ * what's wrong, what we fixed, what to do next.
  *
  * @package LeyMish_AI_Shopping_Readiness
  */
@@ -10,47 +12,137 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Menu page, "Run audit" and CSV export handlers.
+ * Menu, tabs, assets, and the Overview, Audit and Feeds tabs (the others live in their own classes).
  */
 class LASR_Admin {
 
-	const SLUG = 'lasr-ai-readiness';
+	const SLUG           = 'lasr-ai-readiness'; // unchanged from 1.x, so old links and bookmarks still open the screen
+	const WELCOME_OPTION = 'lasr_welcome';
+	const REVIEW_OPTION  = 'lasr_review_asked';
 
 	/**
 	 * Hook everything up.
 	 */
 	public static function init() {
-		add_action( 'admin_menu', array( __CLASS__, 'menu' ), 60 );
+		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
+		add_filter( 'custom_menu_order', '__return_true' );
+		add_filter( 'menu_order', array( __CLASS__, 'menu_order' ), 100 ); // after WooCommerce's own ordering (it puts Products next to itself)
+		add_action( 'admin_init', array( __CLASS__, 'legacy_redirect' ) );
+		add_action( 'admin_page_access_denied', array( __CLASS__, 'legacy_redirect' ) ); // an unknown page is refused before admin_init
 		add_action( 'admin_post_lasr_run_audit', array( __CLASS__, 'handle_run' ) );
 		add_action( 'admin_post_lasr_export_csv', array( __CLASS__, 'handle_csv' ) );
 		add_action( 'admin_post_lasr_review', array( __CLASS__, 'handle_review' ) );
-		add_action( 'admin_post_lasr_dismiss_panel', array( 'LASR_Dashboard', 'handle_dismiss' ) );
+		add_action( 'admin_post_lasr_feeds_settings', array( __CLASS__, 'handle_feeds' ) );
+		add_action( 'admin_post_lasr_rebuild', array( __CLASS__, 'handle_rebuild' ) );
 		add_action( 'admin_notices', array( __CLASS__, 'welcome_notice' ) );
 		add_action( 'admin_post_lasr_dismiss_welcome', array( __CLASS__, 'handle_dismiss_welcome' ) );
-		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'styles' ) );
+		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		LASR_Onboarding::init();
 		add_filter( 'plugin_action_links_' . plugin_basename( LASR_FILE ), array( __CLASS__, 'action_links' ) );
 	}
 
 	/**
-	 * Submenu under WooCommerce.
+	 * The tabs, in order.
+	 *
+	 * @return array<string,string>
 	 */
-	public static function menu() {
-		add_submenu_page(
-			'woocommerce',
-			__( 'LeyMish AI Readiness', 'leymish-ai-shopping-readiness' ),
-			__( 'LeyMish AI Readiness', 'leymish-ai-shopping-readiness' ),
-			'manage_woocommerce',
-			self::SLUG,
-			array( __CLASS__, 'render' )
+	public static function tabs() {
+		return array(
+			'overview'   => __( 'Overview', 'leymish-ai-shopping-readiness' ),
+			'audit'      => __( 'Audit', 'leymish-ai-shopping-readiness' ),
+			'products'   => __( 'Products', 'leymish-ai-shopping-readiness' ),
+			'feeds'      => __( 'Feeds', 'leymish-ai-shopping-readiness' ),
+			'visibility' => __( 'AI visibility', 'leymish-ai-shopping-readiness' ),
+			'fixes'      => __( 'AI fixes', 'leymish-ai-shopping-readiness' ),
+			'team'       => __( 'Team', 'leymish-ai-shopping-readiness' ),
+			'plan'       => __( 'Plan', 'leymish-ai-shopping-readiness' ),
 		);
 	}
 
-	const WELCOME_OPTION = 'lasr_welcome';
+	/**
+	 * Current tab.
+	 *
+	 * @return string
+	 */
+	public static function tab() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab switch.
+		$t = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'overview';
+		if ( 'impact' === $t ) {
+			$t = 'overview'; // 1.x name
+		}
+		return isset( self::tabs()[ $t ] ) ? $t : 'overview';
+	}
+
+	/**
+	 * Our menu icon: the LeyMish mark as an SVG data URI (WordPress colours it to match the admin scheme).
+	 *
+	 * @return string
+	 */
+	public static function icon() {
+		$svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill="black" d="M3 2h3.2v12.6H17V18H3z"/><circle fill="black" cx="14.6" cy="6.2" r="3.2"/></svg>';
+		return 'data:image/svg+xml;base64,' . base64_encode( $svg ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- a data URI for our own menu icon.
+	}
+
+	/**
+	 * One top-level menu, right after WooCommerce, with a count of approvals waiting.
+	 */
+	public static function menu() {
+		$n     = class_exists( 'LASR_Team' ) ? LASR_Team::waiting_count() : 0;
+		$label = esc_html__( 'LeyMish', 'leymish-ai-shopping-readiness' );
+		if ( $n > 0 ) {
+			/* translators: %d: approvals waiting. */
+			$label .= ' <span class="awaiting-mod count-' . (int) $n . '"><span class="pending-count" aria-hidden="true">' . esc_html( number_format_i18n( $n ) ) . '</span><span class="screen-reader-text">' . esc_html( sprintf( _n( '%d approval waiting', '%d approvals waiting', $n, 'leymish-ai-shopping-readiness' ), $n ) ) . '</span></span>';
+		}
+		add_menu_page(
+			__( 'LeyMish AI Readiness', 'leymish-ai-shopping-readiness' ),
+			$label,
+			'manage_woocommerce',
+			self::SLUG,
+			array( __CLASS__, 'render' ),
+			self::icon(),
+			'55.6'
+		);
+	}
+
+	/**
+	 * Our menu sits directly after WooCommerce (above WooCommerce's own Products menu).
+	 *
+	 * @param string[] $order Menu slugs in order.
+	 * @return string[]
+	 */
+	public static function menu_order( $order ) {
+		$order = array_values( array_diff( (array) $order, array( self::SLUG ) ) );
+		$at    = array_search( 'woocommerce', $order, true );
+		if ( false === $at ) {
+			$order[] = self::SLUG;
+			return $order;
+		}
+		array_splice( $order, $at + 1, 0, array( self::SLUG ) );
+		return $order;
+	}
+
+	/**
+	 * Pages from 1.x add-ons and submenus open the right tab now.
+	 */
+	public static function legacy_redirect() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only redirect of an old page address.
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		$map  = array(
+			'lasr-ai-readiness-pro'        => 'plan',
+			'lasr-ai-readiness-data'       => 'products',
+			'lasr-pro-ai'                  => 'fixes',
+			'leymish-store-team'           => 'team',
+			'leymish-store-team-approvals' => 'team',
+		);
+		if ( isset( $map[ $page ] ) && ! LASR_Migrate::active_old() ) {
+			wp_safe_redirect( admin_url( 'admin.php?page=' . self::SLUG . '&tab=' . $map[ $page ] ) );
+			exit;
+		}
+	}
 
 	/**
 	 * One welcome notice on the Plugins screen after the first activation (a notice, not a redirect), until the
-	 * owner opens the page or dismisses it. Only on the Plugins screen, only for people who can use the plugin.
+	 * owner opens the page or dismisses it.
 	 */
 	public static function welcome_notice() {
 		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
@@ -76,7 +168,7 @@ class LASR_Admin {
 	}
 
 	/**
-	 * "Open" link on the Plugins screen.
+	 * "Open dashboard" first on the Plugins screen.
 	 *
 	 * @param string[] $links Existing links.
 	 * @return string[]
@@ -87,19 +179,70 @@ class LASR_Admin {
 	}
 
 	/**
-	 * Small stylesheet, only on our page.
+	 * CSS and the scripts each tab needs, only on our screen.
 	 *
 	 * @param string $hook Current admin page hook.
 	 */
-	public static function styles( $hook ) {
+	public static function assets( $hook ) {
 		if ( false === strpos( (string) $hook, self::SLUG ) ) {
 			return;
 		}
 		wp_enqueue_style( 'lasr-admin', plugins_url( 'assets/admin.css', LASR_FILE ), array(), LASR_VERSION );
+		wp_enqueue_script( 'lasr-admin', plugins_url( 'assets/admin.js', LASR_FILE ), array(), LASR_VERSION, true );
+		wp_localize_script(
+			'lasr-admin',
+			'lasrAdmin',
+			array(
+				'ajax'      => admin_url( 'admin-ajax.php' ),
+				'pollNonce' => wp_create_nonce( 'lasr_upgrade_poll' ),
+				'planUrl'   => admin_url( 'admin.php?page=' . self::SLUG . '&tab=plan&lasr_msg=valid' ),
+				'failed'    => __( 'The purchase arrived but the licence did not activate. Paste the key from your receipt below.', 'leymish-ai-shopping-readiness' ),
+			)
+		);
+		$tab = self::tab();
+		if ( 'products' === $tab ) {
+			wp_enqueue_script( 'lasr-editor', plugins_url( 'assets/editor.js', LASR_FILE ), array(), LASR_VERSION, true );
+			wp_localize_script(
+				'lasr-editor',
+				'lasrEditor',
+				array(
+					'invalid' => __( 'Not a valid GTIN: it needs 8, 12, 13 or 14 digits and a correct check digit.', 'leymish-ai-shopping-readiness' ),
+					'ok'      => __( 'Valid GTIN.', 'leymish-ai-shopping-readiness' ),
+				)
+			);
+		} elseif ( 'fixes' === $tab ) {
+			wp_enqueue_script( 'lasr-ai', plugins_url( 'assets/ai.js', LASR_FILE ), array(), LASR_VERSION, true );
+			wp_localize_script( 'lasr-ai', 'lasrAI', LASR_AI::script_data() );
+		} elseif ( 'team' === $tab ) {
+			wp_enqueue_script( 'lasr-team', plugins_url( 'assets/team.js', LASR_FILE ), array(), LASR_VERSION, true );
+			if ( LASR_Team::connection() ) {
+				wp_enqueue_script( 'lasr-approvals', plugins_url( 'assets/approvals.js', LASR_FILE ), array(), LASR_VERSION, true );
+				wp_localize_script( 'lasr-approvals', 'LASR_APPROVALS', LASR_Team::approvals_data() );
+			}
+		}
 	}
 
 	/**
-	 * Run the audit (POST, nonce, capability), then go back to the page.
+	 * The three answers at the top of every tab.
+	 *
+	 * @param string     $wrong What's wrong.
+	 * @param string     $fixed What we fixed.
+	 * @param string     $next  What to do next.
+	 * @param array|null $cta   [href, label] for the one button, or null.
+	 */
+	public static function three( $wrong, $fixed, $next, $cta ) {
+		echo '<div class="lasr-three" role="region" aria-label="' . esc_attr__( 'Summary', 'leymish-ai-shopping-readiness' ) . '">';
+		echo '<div class="lasr-three-item lasr-three-wrong"><span class="lasr-three-k">' . esc_html__( 'What\'s wrong', 'leymish-ai-shopping-readiness' ) . '</span><p>' . esc_html( $wrong ) . '</p></div>';
+		echo '<div class="lasr-three-item lasr-three-fixed"><span class="lasr-three-k">' . esc_html__( 'What we fixed', 'leymish-ai-shopping-readiness' ) . '</span><p>' . esc_html( $fixed ) . '</p></div>';
+		echo '<div class="lasr-three-item lasr-three-next"><span class="lasr-three-k">' . esc_html__( 'What to do next', 'leymish-ai-shopping-readiness' ) . '</span><p>' . esc_html( $next ) . '</p>';
+		if ( $cta ) {
+			echo '<a class="button button-primary" href="' . esc_url( $cta[0] ) . '">' . esc_html( $cta[1] ) . '</a>';
+		}
+		echo '</div></div>';
+	}
+
+	/**
+	 * Run the audit (POST, nonce, capability), then go back.
 	 */
 	public static function handle_run() {
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
@@ -128,7 +271,7 @@ class LASR_Admin {
 		nocache_headers();
 		header( 'Content-Type: text/csv; charset=utf-8' );
 		header( 'Content-Disposition: attachment; filename=ai-readiness-' . gmdate( 'Y-m-d' ) . '.csv' );
-		$rows   = array( array( 'product_id', 'name', 'url', 'completeness_percent', 'missing', 'gtin_problem' ) );
+		$rows = array( array( 'product_id', 'name', 'url', 'completeness_percent', 'missing', 'gtin_problem' ) );
 		foreach ( $result['products'] as $p ) {
 			$missing = array();
 			foreach ( $p['missing'] as $f ) {
@@ -182,36 +325,60 @@ class LASR_Admin {
 	}
 
 	/**
-	 * The page: Impact (default) and Audit tabs.
+	 * The page: header, tabs, the current tab.
 	 */
 	public static function render() {
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
 			return;
 		}
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab switch.
-		$tab    = isset( $_GET['tab'] ) && 'audit' === sanitize_key( wp_unslash( $_GET['tab'] ) ) ? 'audit' : 'impact';
+		$tab    = self::tab();
 		$result = LASR_Audit::last();
-		echo '<div class="wrap lasr-wrap">';
 		delete_option( self::WELCOME_OPTION ); // they found the page: the Plugins-screen welcome has done its job
-		echo '<h1>' . esc_html__( 'LeyMish AI Readiness', 'leymish-ai-shopping-readiness' ) . '</h1>';
+		echo '<div class="wrap lasr-wrap">';
+		echo '<header class="lasr-head"><span class="lasr-mark" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M3 2h3.2v12.6H17V18H3z"/><circle cx="14.6" cy="6.2" r="3.2"/></svg></span>';
+		echo '<h1 class="lasr-title"><span class="lasr-wordmark">LeyMish</span> <span class="lasr-sub">' . esc_html__( 'AI Readiness', 'leymish-ai-shopping-readiness' ) . '</span></h1>';
+		echo '<span class="lasr-plan-pill">' . esc_html( LASR_License::plan_label() ) . '</span></header>';
+		echo '<hr class="wp-header-end">';
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display-only flag set by our own redirect.
 		if ( isset( $_GET['lasr_done'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Audit finished.', 'leymish-ai-shopping-readiness' ) . '</p></div>';
 		}
 		LASR_Onboarding::notice();
-		LASR_Onboarding::render_checklist( $result );
-		$base = admin_url( 'admin.php?page=' . self::SLUG );
-		echo '<nav class="nav-tab-wrapper" aria-label="' . esc_attr__( 'AI Readiness sections', 'leymish-ai-shopping-readiness' ) . '">';
-		echo '<a href="' . esc_url( $base ) . '" class="nav-tab' . ( 'impact' === $tab ? ' nav-tab-active" aria-current="page' : '' ) . '">' . esc_html__( 'Impact', 'leymish-ai-shopping-readiness' ) . '</a>';
-		echo '<a href="' . esc_url( $base . '&tab=audit' ) . '" class="nav-tab' . ( 'audit' === $tab ? ' nav-tab-active" aria-current="page' : '' ) . '">' . esc_html__( 'Audit', 'leymish-ai-shopping-readiness' ) . '</a>';
-		echo '</nav>';
-		if ( 'impact' === $tab ) {
-			self::render_impact( $result );
-		} else {
-			self::render_audit( $result );
+		$base    = admin_url( 'admin.php?page=' . self::SLUG );
+		$waiting = LASR_Team::waiting_count();
+		echo '<nav class="nav-tab-wrapper lasr-tabs" aria-label="' . esc_attr__( 'LeyMish sections', 'leymish-ai-shopping-readiness' ) . '">';
+		foreach ( self::tabs() as $key => $label ) {
+			$url   = 'overview' === $key ? $base : $base . '&tab=' . $key;
+			$extra = 'team' === $key && $waiting ? ' <span class="lasr-tab-count">' . esc_html( (string) $waiting ) . '</span>' : '';
+			echo '<a href="' . esc_url( $url ) . '" class="nav-tab' . ( $tab === $key ? ' nav-tab-active" aria-current="page' : '' ) . '">' . esc_html( $label ) . $extra . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $extra is escaped above.
 		}
-		LASR_Onboarding::render_optin();
-		echo '</div>';
+		echo '</nav><div class="lasr-tab-body">';
+		switch ( $tab ) {
+			case 'audit':
+				self::render_audit( $result );
+				break;
+			case 'products':
+				LASR_Products::render( $result );
+				break;
+			case 'feeds':
+				self::render_feeds();
+				break;
+			case 'visibility':
+				LASR_Visibility::render( $result );
+				break;
+			case 'fixes':
+				LASR_AI::render( $result );
+				break;
+			case 'team':
+				LASR_Team::render();
+				break;
+			case 'plan':
+				LASR_Plan::render();
+				break;
+			default:
+				self::render_overview( $result );
+		}
+		echo '</div></div>';
 	}
 
 	/**
@@ -220,7 +387,7 @@ class LASR_Admin {
 	 * @param bool   $again Whether an audit already exists.
 	 * @param string $tab   Tab to come back to.
 	 */
-	private static function run_form( $again, $tab = 'impact' ) {
+	private static function run_form( $again, $tab = 'overview' ) {
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="lasr-run">';
 		wp_nonce_field( 'lasr_run_audit' );
 		echo '<input type="hidden" name="action" value="lasr_run_audit" /><input type="hidden" name="lasr_tab" value="' . esc_attr( $tab ) . '" />';
@@ -230,18 +397,26 @@ class LASR_Admin {
 	}
 
 	/**
-	 * Impact tab: score over time, what was fixed, product data then vs now, what to fix next.
+	 * Overview: score, areas, next wins, what changed this week, the trend, product data and the report.
 	 *
 	 * @param array|null $result Last audit.
 	 */
-	private static function render_impact( $result ) {
+	private static function render_overview( $result ) {
 		$history  = LASR_Impact::history();
 		$baseline = LASR_Impact::baseline();
 		if ( ! $result || ! $history || ! $baseline ) {
+			self::three(
+				__( 'You don\'t know yet whether AI shopping agents can read your store.', 'leymish-ai-shopping-readiness' ),
+				__( 'Nothing yet.', 'leymish-ai-shopping-readiness' ),
+				__( 'Run your first audit. It takes about a minute and nothing leaves your site.', 'leymish-ai-shopping-readiness' ),
+				null
+			);
+			LASR_Onboarding::render_checklist( $result );
 			echo '<div class="lasr-empty"><h2>' . esc_html__( 'See what improves', 'leymish-ai-shopping-readiness' ) . '</h2>';
-			echo '<p>' . esc_html__( 'Run your first audit to set a starting point. After each change you make, run it again: this page shows your score over time, the checks you fixed and how much of your product data is complete. Everything is stored on this site only.', 'leymish-ai-shopping-readiness' ) . '</p>';
+			echo '<p>' . esc_html__( 'Your first audit sets a starting point. After each change, run it again: this page shows your score over time, the checks you fixed and how much of your product data is complete. Everything is stored on this site only.', 'leymish-ai-shopping-readiness' ) . '</p>';
 			self::run_form( false );
 			echo '</div>';
+			LASR_Onboarding::render_optin();
 			return;
 		}
 		$current = end( $history );
@@ -250,16 +425,42 @@ class LASR_Admin {
 		foreach ( $result['checks'] as $c ) {
 			$labels[ $c['id'] ] = $c['label'];
 		}
-
 		$delta = (int) $current['s'] - (int) $baseline['s'];
-		if ( count( $history ) > 1 || $baseline['t'] !== $current['t'] ) {
-			if ( 0 === $delta ) {
-				/* translators: 1: starting score, 2: date of the first audit. */
-				$text = sprintf( __( 'Same score as when you started (%1$d on %2$s)', 'leymish-ai-shopping-readiness' ), (int) $baseline['s'], wp_date( $date, (int) $baseline['t'] ) );
-			} else {
-				/* translators: 1: change in points, e.g. +12, 2: starting score, 3: date of the first audit. */
-				$text = sprintf( __( '%1$s points since you started (%2$d on %3$s)', 'leymish-ai-shopping-readiness' ), ( $delta > 0 ? '+' : '' ) . $delta, (int) $baseline['s'], wp_date( $date, (int) $baseline['t'] ) );
+		$wins  = LASR_Dashboard::wins( $result, 3 );
+		$log   = LASR_Worklog::worklog();
+		$week  = LASR_Worklog::since( $log, time() - WEEK_IN_SECONDS );
+		$total = 0;
+		foreach ( (array) $log['counts'] as $n ) {
+			$total += (int) $n;
+		}
+		self::three(
+			LASR_Dashboard::verdict( $result ),
+			$total
+				/* translators: 1: changes made, 2: score change. */
+				? sprintf( _n( '%1$d change made here; score %2$s since you started.', '%1$d changes made here; score %2$s since you started.', $total, 'leymish-ai-shopping-readiness' ), $total, ( $delta >= 0 ? '+' : '' ) . $delta )
+				/* translators: %s: score change. */
+				: sprintf( __( 'Score %s since your first audit.', 'leymish-ai-shopping-readiness' ), ( $delta >= 0 ? '+' : '' ) . $delta ),
+			$wins ? $wins[0]['fix'] : __( 'Nothing to fix. Keep an eye on it with the weekly re-audit.', 'leymish-ai-shopping-readiness' ),
+			$wins ? array( LASR_Dashboard::fix_url( $wins[0]['id'] ), __( 'Fix it', 'leymish-ai-shopping-readiness' ) ) : null
+		);
+
+		$alerts = LASR_Schedule::alerts();
+		if ( $alerts ) {
+			echo '<section class="lasr-alerts" role="alert"><h2>' . esc_html__( 'Needs your attention', 'leymish-ai-shopping-readiness' ) . '</h2><ul>';
+			foreach ( $alerts['items'] as $a ) {
+				echo '<li>' . esc_html( $a ) . '</li>';
 			}
+			echo '</ul><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+			wp_nonce_field( 'lasr_dismiss_alerts' );
+			echo '<input type="hidden" name="action" value="lasr_dismiss_alerts" /><button type="submit" class="button-link">' . esc_html__( 'Dismiss', 'leymish-ai-shopping-readiness' ) . '</button></form></section>';
+		}
+
+		if ( count( $history ) > 1 || $baseline['t'] !== $current['t'] ) {
+			$text = 0 === $delta
+				/* translators: 1: starting score, 2: date of the first audit. */
+				? sprintf( __( 'Same score as when you started (%1$d on %2$s)', 'leymish-ai-shopping-readiness' ), (int) $baseline['s'], wp_date( $date, (int) $baseline['t'] ) )
+				/* translators: 1: change in points, e.g. +12, 2: starting score, 3: date of the first audit. */
+				: sprintf( __( '%1$s points since you started (%2$d on %3$s)', 'leymish-ai-shopping-readiness' ), ( $delta > 0 ? '+' : '' ) . $delta, (int) $baseline['s'], wp_date( $date, (int) $baseline['t'] ) );
 		} else {
 			$text = __( 'Your starting point. Make a fix, run the audit again, and the change shows here.', 'leymish-ai-shopping-readiness' );
 		}
@@ -267,26 +468,21 @@ class LASR_Admin {
 			self::run_form( true );
 		} );
 		LASR_Dashboard::cards( $result['checks'] );
-		/**
-		 * Lets add-ons (Pro) put their own headline section right under the area cards.
-		 *
-		 * @param array[] $history  Weekly snapshots, oldest first.
-		 * @param array   $baseline Install baseline.
-		 * @param array   $result   Last audit.
-		 */
-		do_action( 'lasr_impact_hero', $history, $baseline, $result );
 		if ( self::review_due( $delta ) ) {
 			self::review_box();
 		}
 
-		$wins = LASR_Dashboard::wins( $result, 3 );
-		echo '<h2>' . esc_html__( 'Your biggest wins', 'leymish-ai-shopping-readiness' ) . '</h2>';
+		echo '<div class="lasr-two"><section><h2>' . esc_html__( 'Your next 3 wins', 'leymish-ai-shopping-readiness' ) . '</h2>';
 		if ( $wins ) {
 			LASR_Dashboard::wins_list( $wins );
-			echo '<p><a href="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG . '&tab=audit' ) ) . '">' . esc_html__( 'See every check and product in the audit', 'leymish-ai-shopping-readiness' ) . '</a></p>';
 		} else {
 			echo '<p><strong>' . esc_html__( 'Nothing to fix. Nice.', 'leymish-ai-shopping-readiness' ) . '</strong></p>';
 		}
+		echo '</section><section><h2>' . esc_html__( 'What changed this week', 'leymish-ai-shopping-readiness' ) . '</h2>';
+		self::this_week( $week, $history );
+		echo '</section></div>';
+
+		self::earlier_work( $history );
 
 		echo '<h2>' . esc_html__( 'Score over time', 'leymish-ai-shopping-readiness' ) . '</h2>';
 		self::chart( $history );
@@ -313,6 +509,7 @@ class LASR_Admin {
 		}
 
 		echo '<h2>' . esc_html__( 'Product data', 'leymish-ai-shopping-readiness' ) . '</h2>';
+		LASR_Worklog::before_after( $baseline, $current );
 		$names = array(
 			'identifier' => __( 'Valid GTIN or MPN', 'leymish-ai-shopping-readiness' ),
 			'brand'      => __( 'Brand', 'leymish-ai-shopping-readiness' ),
@@ -328,21 +525,98 @@ class LASR_Admin {
 		}
 		echo '</tbody></table>';
 
-		LASR_Dashboard::panel( $result );
-
-		/**
-		 * Lets add-ons (Pro) add their own Impact sections.
-		 *
-		 * @param array[] $history  Weekly snapshots, oldest first.
-		 * @param array   $baseline Install baseline.
-		 * @param array   $result   Last audit.
-		 */
-		do_action( 'lasr_impact_after', $history, $baseline, $result );
+		echo '<h2>' . esc_html__( 'Before and after report', 'leymish-ai-shopping-readiness' ) . '</h2><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="lasr-report">';
+		wp_nonce_field( 'lasr_report' );
+		echo '<input type="hidden" name="action" value="lasr_report" />';
+		submit_button( __( 'Download report (HTML)', 'leymish-ai-shopping-readiness' ), 'secondary', 'submit', false );
+		echo ' <span class="description">' . esc_html__( 'One page with real dates you can print, save as PDF or send to a client.', 'leymish-ai-shopping-readiness' ) . '</span></form>';
+		LASR_Onboarding::render_optin();
 	}
 
 	/**
-	 * The one review request: only on our own Impact tab, only after the score improved by 10 or more points, and
-	 * gone for good after either answer. No incentive, never a site-wide notice.
+	 * "What changed this week": this site's own changes, the score over the week, the team and AI visibility.
+	 *
+	 * @param array<string,int> $week    Work counted in the last 7 days.
+	 * @param array[]           $history Snapshots.
+	 */
+	private static function this_week( array $week, array $history ) {
+		$items = array();
+		$kinds = LASR_Worklog::kinds();
+		foreach ( $week as $k => $n ) {
+			if ( isset( $kinds[ $k ] ) ) {
+				$items[] = $kinds[ $k ] . ': ' . (int) $n;
+			}
+		}
+		if ( count( $history ) >= 2 ) {
+			$last = end( $history );
+			$prev = prev( $history );
+			$d    = (int) $last['s'] - (int) $prev['s'];
+			/* translators: 1: signed change, 2: score. */
+			$items[] = sprintf( __( 'Score %1$s on the week before (now %2$d).', 'leymish-ai-shopping-readiness' ), ( $d >= 0 ? '+' : '' ) . $d, (int) $last['s'] );
+		}
+		$vis = LASR_Visibility::latest();
+		if ( $vis && (int) $vis['t'] >= time() - WEEK_IN_SECONDS ) {
+			$s = LASR_Visibility::share( $vis );
+			/* translators: 1: answers citing the store, 2: questions answered. */
+			$items[] = sprintf( __( 'AI visibility: cited in %1$d of %2$d answers.', 'leymish-ai-shopping-readiness' ), $s['cited'], $s['answered'] );
+		}
+		if ( ! $items ) {
+			echo '<p class="lasr-empty-state">' . esc_html__( 'Nothing changed this week yet. Fix one of your next wins, or let your team propose changes on Monday.', 'leymish-ai-shopping-readiness' ) . '</p>';
+			return;
+		}
+		echo '<ul class="lasr-list">';
+		foreach ( $items as $i ) {
+			echo '<li>' . esc_html( $i ) . '</li>';
+		}
+		echo '</ul>';
+	}
+
+	/**
+	 * Earlier work by LeyMish agents (from Store Team), labelled as such; and Pro this month when Pro is on.
+	 *
+	 * @param array[] $history Snapshots.
+	 */
+	private static function earlier_work( array $history ) {
+		$earlier = LASR_Worklog::earlier();
+		$pro     = LASR_License::is_pro();
+		if ( count( $earlier ) < 2 && ! $pro ) {
+			return;
+		}
+		echo '<section class="lasr-card-box lasr-history">';
+		if ( count( $earlier ) >= 2 ) {
+			$first = reset( $earlier );
+			$last  = end( $earlier );
+			echo '<h2>' . esc_html__( 'Fixed by LeyMish agents', 'leymish-ai-shopping-readiness' ) . '</h2>';
+			echo '<p class="lasr-then-now-score"><span class="lasr-big">' . esc_html( $first['score'] . ' → ' . $last['score'] ) . '</span> <span class="description">';
+			/* translators: 1: first date, 2: last date. */
+			echo esc_html( sprintf( __( 'audit score, %1$s to %2$s, before this plugin\'s Pro features were on', 'leymish-ai-shopping-readiness' ), $first['date'], $last['date'] ) ) . '</span></p><ul class="lasr-list">';
+			foreach ( $earlier as $e ) {
+				if ( '' !== $e['label'] ) {
+					echo '<li>' . esc_html( $e['date'] . ': ' . $e['label'] ) . '</li>';
+				}
+			}
+			echo '</ul>';
+		}
+		if ( $pro ) {
+			$ucp   = LASR_Ucp::settings();
+			$items = array(
+				array( 'yes' === $ucp['ucp'], __( 'UCP business profile published at /.well-known/ucp', 'leymish-ai-shopping-readiness' ) ),
+				array( 'yes' === $ucp['identifiers'] || 'yes' === $ucp['returns'] || 'yes' === $ucp['shipping'], __( 'Product schema enriched from your store settings', 'leymish-ai-shopping-readiness' ) ),
+				array( (bool) LASR_Visibility::latest(), __( 'AI visibility baseline taken', 'leymish-ai-shopping-readiness' ) ),
+				array( (bool) get_option( LASR_Schedule::OUTSIDE ), __( 'Outside monitoring checked your store', 'leymish-ai-shopping-readiness' ) ),
+			);
+			echo '<h2>' . esc_html__( 'Pro this month', 'leymish-ai-shopping-readiness' ) . '</h2><ul class="lasr-checklist">';
+			foreach ( $items as $i ) {
+				echo '<li class="' . ( $i[0] ? 'is-done' : 'is-todo' ) . '"><span class="screen-reader-text">' . esc_html( $i[0] ? __( 'Done:', 'leymish-ai-shopping-readiness' ) : __( 'Not yet:', 'leymish-ai-shopping-readiness' ) ) . '</span> ' . esc_html( $i[1] ) . '</li>';
+			}
+			echo '</ul>';
+		}
+		echo '</section>';
+	}
+
+	/**
+	 * The one review request: only on our Overview tab, only after the score improved by 10 or more points, and gone
+	 * for good after either answer. No incentive, never a site-wide notice.
 	 *
 	 * @param int $delta Points gained since the first audit.
 	 * @return bool
@@ -350,8 +624,6 @@ class LASR_Admin {
 	public static function review_due( $delta ) {
 		return (int) $delta >= 10 && ! get_option( self::REVIEW_OPTION );
 	}
-
-	const REVIEW_OPTION = 'lasr_review_asked';
 
 	/**
 	 * The box itself.
@@ -412,7 +684,7 @@ class LASR_Admin {
 				return $p[0] . ',' . $p[1];
 			}, $pts ) ) ) . '" />';
 		}
-		foreach ( $pts as $i => $p ) {
+		foreach ( $pts as $p ) {
 			echo '<circle class="lasr-dot" cx="' . esc_attr( (string) $p[0] ) . '" cy="' . esc_attr( (string) $p[1] ) . '" r="4" />';
 		}
 		$first = reset( $history );
@@ -430,23 +702,42 @@ class LASR_Admin {
 	}
 
 	/**
-	 * Audit tab: the full result (unchanged from 1.0).
+	 * Audit tab: every check with plain-words fixes.
 	 *
 	 * @param array|null $result Last audit.
 	 */
 	private static function render_audit( $result ) {
-		echo '<p class="lasr-lede">' . esc_html__( 'Can ChatGPT, Claude, Perplexity and Google find, read and trust your products? This audit checks your product data and what AI crawlers actually receive from your store. It runs entirely on your site; nothing is sent anywhere.', 'leymish-ai-shopping-readiness' ) . '</p>';
 		if ( ! $result ) {
+			self::three(
+				__( 'No audit yet.', 'leymish-ai-shopping-readiness' ),
+				__( 'Nothing yet.', 'leymish-ai-shopping-readiness' ),
+				__( 'Run the audit: it checks your product data and what AI crawlers actually receive.', 'leymish-ai-shopping-readiness' ),
+				null
+			);
+			echo '<p class="lasr-lede">' . esc_html__( 'Can ChatGPT, Claude, Perplexity and Google find, read and trust your products? This audit checks your product data and what AI crawlers actually receive from your store. It runs entirely on your site; nothing is sent anywhere.', 'leymish-ai-shopping-readiness' ) . '</p>';
 			self::run_form( false, 'audit' );
 			return;
 		}
-
+		$fixes = LASR_Scoring::fix_list( $result['checks'] );
+		$pass  = 0;
+		foreach ( $result['checks'] as $c ) {
+			$pass += 'pass' === $c['status'] ? 1 : 0;
+		}
+		$hist    = LASR_Impact::history();
+		$changes = LASR_Impact::baseline() && $hist ? LASR_Impact::changes( LASR_Impact::baseline(), end( $hist ) ) : array( 'fixed' => array() );
+		self::three(
+			/* translators: %d: checks that need work. */
+			$fixes ? sprintf( _n( '%d check needs work.', '%d checks need work.', count( $fixes ), 'leymish-ai-shopping-readiness' ), count( $fixes ) ) : __( 'Every check passes.', 'leymish-ai-shopping-readiness' ),
+			/* translators: 1: checks passing, 2: checks fixed since the first audit. */
+			sprintf( __( '%1$d checks pass; %2$d fixed since your first audit.', 'leymish-ai-shopping-readiness' ), $pass, count( $changes['fixed'] ) ),
+			$fixes ? $fixes[0]['fix'] : __( 'Run it again after changes to your store.', 'leymish-ai-shopping-readiness' ),
+			$fixes ? array( LASR_Dashboard::fix_url( $fixes[0]['id'] ), __( 'Fix it', 'leymish-ai-shopping-readiness' ) ) : null
+		);
 		/* translators: %s: date and time of the audit. */
 		$when = sprintf( __( 'Last audit: %s', 'leymish-ai-shopping-readiness' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $result['ran_at'] ) );
 		LASR_Dashboard::hero( $result, LASR_Impact::history(), LASR_Impact::baseline(), $when, function () {
 			self::run_form( true, 'audit' );
 		} );
-		LASR_Dashboard::cards( $result['checks'] );
 
 		echo '<details class="lasr-share"><summary>' . esc_html__( 'Share your score', 'leymish-ai-shopping-readiness' ) . '</summary>';
 		echo '<p class="description">' . esc_html__( 'Copy this text to share it. The plugin doesn\'t send it anywhere.', 'leymish-ai-shopping-readiness' ) . '</p>';
@@ -456,11 +747,8 @@ class LASR_Admin {
 		if ( $wins ) {
 			echo '<h2>' . esc_html__( 'Fix these first', 'leymish-ai-shopping-readiness' ) . '</h2>';
 			LASR_Dashboard::wins_list( $wins );
-		} else {
-			echo '<p><strong>' . esc_html__( 'Nothing to fix. Nice.', 'leymish-ai-shopping-readiness' ) . '</strong></p>';
 		}
 
-		// Every check, grouped by the same four areas as the cards (anything unmapped goes last).
 		$area  = array();
 		$names = array();
 		foreach ( LASR_Dashboard::category_map() as $key => $def ) {
@@ -477,49 +765,26 @@ class LASR_Admin {
 			return $x - $y;
 		} );
 		echo '<h2>' . esc_html__( 'All checks', 'leymish-ai-shopping-readiness' ) . '</h2>';
-		echo '<table class="widefat striped lasr-table lasr-checks"><thead><tr><th scope="col">' . esc_html__( 'Check', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col" class="lasr-col-area">' . esc_html__( 'Area', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col">' . esc_html__( 'Result', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col">' . esc_html__( 'Points', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col">' . esc_html__( 'Details', 'leymish-ai-shopping-readiness' ) . '</th></tr></thead><tbody>';
+		echo '<div class="lasr-scroll"><table class="widefat striped lasr-table lasr-checks"><thead><tr><th scope="col">' . esc_html__( 'Check', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col" class="lasr-col-area">' . esc_html__( 'Area', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col">' . esc_html__( 'Result', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col">' . esc_html__( 'Points', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col">' . esc_html__( 'Details and fix', 'leymish-ai-shopping-readiness' ) . '</th></tr></thead><tbody>';
 		foreach ( $checks as $c ) {
 			$pts = in_array( $c['status'], array( 'info', 'skip' ), true ) ? '—' : $c['earned'] . ' / ' . $c['points'];
 			$a   = isset( $area[ $c['id'] ] ) ? $names[ $area[ $c['id'] ] ] : '';
-			echo '<tr><th scope="row">' . esc_html( $c['label'] ) . '</th><td class="lasr-col-area">' . esc_html( $a ) . '</td><td>' . wp_kses_post( self::badge( $c['status'] ) ) . '</td><td>' . esc_html( (string) $pts ) . '</td><td>' . esc_html( $c['detail'] ) . '</td></tr>';
+			$fix = ( 'pass' !== $c['status'] && ! empty( $c['fix'] ) ) ? '<p class="lasr-fix-text">' . esc_html( $c['fix'] ) . '</p>' : '';
+			echo '<tr><th scope="row">' . esc_html( $c['label'] ) . '</th><td class="lasr-col-area">' . esc_html( $a ) . '</td><td>' . wp_kses_post( self::badge( $c['status'] ) ) . '</td><td>' . esc_html( (string) $pts ) . '</td><td>' . esc_html( $c['detail'] ) . $fix . '</td></tr>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $fix is escaped above.
 		}
-		echo '</tbody></table>';
+		echo '</tbody></table></div>';
 
 		$all = (array) $result['products'];
 		if ( $all ) {
-			$labels   = LASR_Audit::field_labels();
-			$gaps     = array_values( array_filter( $all, function ( $p ) {
-				return ! empty( $p['missing'] );
-			} ) );
-			$complete = count( $all ) - count( $gaps );
-			echo '<h2>' . esc_html__( 'Products with the most gaps', 'leymish-ai-shopping-readiness' ) . '</h2>';
+			echo '<h2>' . esc_html__( 'Products', 'leymish-ai-shopping-readiness' ) . '</h2><p>';
+			/* translators: %d: products with gaps. */
+			echo esc_html( sprintf( _n( '%d published product has at least one gap.', '%d published products have at least one gap.', LASR_Dashboard::products_with_gaps( $all ), 'leymish-ai-shopping-readiness' ), LASR_Dashboard::products_with_gaps( $all ) ) ) . ' <a href="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG . '&tab=products' ) ) . '">' . esc_html__( 'Fix them in the Products tab', 'leymish-ai-shopping-readiness' ) . '</a></p>';
 			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="lasr-csv">';
 			wp_nonce_field( 'lasr_export_csv' );
 			echo '<input type="hidden" name="action" value="lasr_export_csv" />';
 			/* translators: %d: number of products. */
 			submit_button( sprintf( __( 'Download CSV (%d products)', 'leymish-ai-shopping-readiness' ), count( $all ) ), 'secondary', 'submit', false );
 			echo '</form>';
-			if ( $gaps ) {
-				/* translators: %d: number of products with gaps. */
-				echo '<details class="lasr-products"><summary>' . esc_html( sprintf( _n( 'See %d product with gaps', 'See products with gaps (%d)', count( $gaps ), 'leymish-ai-shopping-readiness' ), count( $gaps ) ) ) . '</summary>';
-				echo '<table class="widefat striped lasr-table"><thead><tr><th scope="col">' . esc_html__( 'Product', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col">' . esc_html__( 'Complete', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col">' . esc_html__( 'Missing', 'leymish-ai-shopping-readiness' ) . '</th></tr></thead><tbody>';
-				foreach ( array_slice( $gaps, 0, 50 ) as $p ) {
-					$missing = array();
-					foreach ( $p['missing'] as $f ) {
-						$missing[] = isset( $labels[ $f ] ) ? $labels[ $f ] : $f;
-					}
-					echo '<tr><td><a href="' . esc_url( (string) get_edit_post_link( $p['id'] ) ) . '">' . esc_html( $p['name'] ) . '</a></td><td>' . esc_html( (int) round( 100 * $p['score'] ) . '%' ) . '</td><td>' . esc_html( implode( ', ', $missing ) ) . '</td></tr>';
-				}
-				echo '</tbody></table>';
-				if ( count( $gaps ) > 50 ) {
-					echo '<p class="description">' . esc_html__( 'Showing the 50 with the most gaps; the CSV has every product.', 'leymish-ai-shopping-readiness' ) . '</p>';
-				}
-				echo '</details>';
-			}
-			if ( $complete > 0 ) {
-				/* translators: %d: number of complete products. */
-				echo '<p class="description">' . esc_html( sprintf( _n( '%d product has nothing missing and is hidden here.', '%d products have nothing missing and are hidden here.', $complete, 'leymish-ai-shopping-readiness' ), $complete ) ) . '</p>';
-			}
 			if ( $result['summary']['checked'] >= $result['summary']['limit'] ) {
 				/* translators: %d: product limit. */
 				echo '<p class="description">' . esc_html( sprintf( __( 'Checked the first %d products. Developers can raise this with the lasr_product_limit filter.', 'leymish-ai-shopping-readiness' ), (int) $result['summary']['limit'] ) ) . '</p>';
@@ -528,12 +793,173 @@ class LASR_Admin {
 	}
 
 	/**
-	 * Products missing a valid identifier or a brand (what the Pro bulk editor fixes).
-	 *
-	 * @param array $products Audit product rows.
-	 * @return int
+	 * Save the Feeds tab switches.
 	 */
-	public static function identifier_gaps( $products ) {
-		return LASR_Dashboard::identifier_gaps( $products );
+	public static function handle_feeds() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have permission to do that.', 'leymish-ai-shopping-readiness' ) );
+		}
+		check_admin_referer( 'lasr_feeds_settings' );
+		$feeds = empty( $_POST['feeds'] ) ? 'no' : 'yes';
+		update_option( LASR_Feeds::ENABLED, $feeds, false );
+		update_option( LASR_Llms::OPTION, empty( $_POST['llms'] ) ? 'no' : 'yes', false );
+		LASR_Ucp::save( wp_unslash( $_POST ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- every field is sanitised in LASR_Ucp::save().
+		if ( 'yes' === $feeds ) {
+			LASR_Feeds::rebuild();
+		}
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::SLUG . '&tab=feeds&lasr_msg=saved' ) );
+		exit;
+	}
+
+	/**
+	 * Rebuild the feeds now.
+	 */
+	public static function handle_rebuild() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have permission to do that.', 'leymish-ai-shopping-readiness' ) );
+		}
+		check_admin_referer( 'lasr_rebuild' );
+		LASR_Feeds::rebuild();
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::SLUG . '&tab=feeds&lasr_msg=rebuilt' ) );
+		exit;
+	}
+
+	/**
+	 * Feeds tab: OpenAI JSONL, Google TSV, llms.txt and the UCP profile, plus the schema settings.
+	 */
+	private static function render_feeds() {
+		$built   = get_option( LASR_Feeds::BUILT );
+		$on      = LASR_Feeds::enabled();
+		$ucp     = LASR_Ucp::settings();
+		$outside = get_option( LASR_Schedule::OUTSIDE );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display-only code from our own redirect.
+		$msg    = isset( $_GET['lasr_msg'] ) ? sanitize_key( wp_unslash( $_GET['lasr_msg'] ) ) : '';
+		$issues = is_array( $built ) && isset( $built['issues'] ) ? $built['issues'] : null;
+		$wrong  = array();
+		if ( ! $on ) {
+			$wrong[] = __( 'Your product feeds are off', 'leymish-ai-shopping-readiness' );
+		} elseif ( $issues && ( $issues['missing_required'] || $issues['no_identifier'] || $issues['no_brand'] ) ) {
+			/* translators: %d: feed items with gaps. */
+			$wrong[] = sprintf( __( '%d feed items are missing an identifier or brand', 'leymish-ai-shopping-readiness' ), max( (int) $issues['no_identifier'], (int) $issues['no_brand'], (int) $issues['missing_required'] ) );
+		}
+		if ( ! LASR_Llms::enabled() ) {
+			$wrong[] = __( 'no llms.txt', 'leymish-ai-shopping-readiness' );
+		}
+		if ( 'yes' !== $ucp['ucp'] ) {
+			$wrong[] = __( 'no UCP profile', 'leymish-ai-shopping-readiness' );
+		}
+		$done = array_filter(
+			array(
+				$on ? __( 'feeds on', 'leymish-ai-shopping-readiness' ) : '',
+				LASR_Llms::enabled() ? __( 'llms.txt published', 'leymish-ai-shopping-readiness' ) : '',
+				'yes' === $ucp['ucp'] ? __( 'UCP profile published', 'leymish-ai-shopping-readiness' ) : '',
+				'yes' === $ucp['returns'] ? __( 'return policy in your schema', 'leymish-ai-shopping-readiness' ) : '',
+			)
+		);
+		self::three(
+			$wrong ? ucfirst( implode( ', ', $wrong ) ) . '.' : __( 'Your feeds, llms.txt and UCP profile are all published.', 'leymish-ai-shopping-readiness' ),
+			$done ? ucfirst( implode( ', ', $done ) ) . '.' : __( 'Nothing published yet.', 'leymish-ai-shopping-readiness' ),
+			$wrong ? __( 'Switch on what you want below and save. Everything here runs on your site, free.', 'leymish-ai-shopping-readiness' ) : __( 'Give the feed URLs to OpenAI and Google Merchant Center.', 'leymish-ai-shopping-readiness' ),
+			$wrong ? array( '#lasr-feeds-form', __( 'Switch them on', 'leymish-ai-shopping-readiness' ) ) : null
+		);
+		if ( $msg ) {
+			echo '<div class="notice notice-success is-dismissible inline"><p>' . esc_html( 'rebuilt' === $msg ? __( 'Feeds rebuilt.', 'leymish-ai-shopping-readiness' ) : __( 'Saved.', 'leymish-ai-shopping-readiness' ) ) . '</p></div>';
+		}
+
+		$fmt   = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+		$cards = array(
+			array( 'openai.jsonl', __( 'OpenAI product feed (JSONL)', 'leymish-ai-shopping-readiness' ), LASR_Feeds::url( 'openai.jsonl' ), $on ),
+			array( 'google.tsv', __( 'Google Merchant Center feed (TSV)', 'leymish-ai-shopping-readiness' ), LASR_Feeds::url( 'google.tsv' ), $on ),
+			array( 'llms', 'llms.txt', home_url( '/llms.txt' ), LASR_Llms::enabled() ),
+			array( 'ucp', __( 'UCP business profile', 'leymish-ai-shopping-readiness' ), home_url( '/.well-known/ucp' ), 'yes' === $ucp['ucp'] ),
+		);
+		echo '<ul class="lasr-cards lasr-feed-cards">';
+		foreach ( $cards as $c ) {
+			$status = $c[3] ? 'pass' : 'skip';
+			$word   = $c[3] ? __( 'Published', 'leymish-ai-shopping-readiness' ) : __( 'Off', 'leymish-ai-shopping-readiness' );
+			$about  = '';
+			if ( $c[3] && in_array( $c[0], array( 'openai.jsonl', 'google.tsv' ), true ) && is_array( $built ) ) {
+				if ( isset( $built['written'][ $c[0] ] ) && ! $built['written'][ $c[0] ] ) {
+					$status = 'fail';
+					$word   = __( 'Could not write the file', 'leymish-ai-shopping-readiness' );
+				} elseif ( $issues && $issues['missing_required'] ) {
+					$status = 'warn';
+					$word   = __( 'Needs work', 'leymish-ai-shopping-readiness' );
+				}
+				/* translators: 1: number of items, 2: date and time. */
+				$about = sprintf( __( '%1$d items, built %2$s', 'leymish-ai-shopping-readiness' ), (int) $built['rows'], wp_date( $fmt, (int) $built['at'] ) );
+				$key   = 'openai.jsonl' === $c[0] ? 'openai' : 'google';
+				if ( is_array( $outside ) && isset( $outside['feeds'][ $key ]['ok'] ) ) {
+					$about .= '. ' . ( $outside['feeds'][ $key ]['ok'] ? __( 'Checked from outside: OK.', 'leymish-ai-shopping-readiness' ) : __( 'Checked from outside: errors found.', 'leymish-ai-shopping-readiness' ) );
+				}
+			} elseif ( 'ucp' === $c[0] && $c[3] ) {
+				$about = __( 'Valid profile, no checkout services declared (WooCommerce core has no UCP checkout yet).', 'leymish-ai-shopping-readiness' );
+			}
+			echo '<li class="lasr-card lasr-st-' . esc_attr( $status ) . '"><h3>' . esc_html( $c[1] ) . '</h3><span class="lasr-badge lasr-' . esc_attr( $status ) . '">' . esc_html( $word ) . '</span>';
+			if ( '' !== $about ) {
+				echo '<p class="lasr-card-num">' . esc_html( $about ) . '</p>';
+			}
+			if ( $c[3] ) {
+				echo '<p class="lasr-feed-url"><a href="' . esc_url( $c[2] ) . '" target="_blank" rel="noopener">' . esc_html( $c[2] ) . '</a></p>';
+			}
+			echo '</li>';
+		}
+		echo '</ul>';
+		if ( $issues && $on ) {
+			$lines = array();
+			if ( $issues['no_identifier'] ) {
+				/* translators: %d: number of feed rows. */
+				$lines[] = sprintf( _n( '%d item has no GTIN or MPN', '%d items have no GTIN or MPN', $issues['no_identifier'], 'leymish-ai-shopping-readiness' ), $issues['no_identifier'] );
+			}
+			if ( $issues['no_brand'] ) {
+				/* translators: %d: number of feed rows. */
+				$lines[] = sprintf( _n( '%d item has no brand', '%d items have no brand', $issues['no_brand'], 'leymish-ai-shopping-readiness' ), $issues['no_brand'] );
+			}
+			if ( $lines ) {
+				echo '<p>' . esc_html( implode( '; ', $lines ) . '.' ) . ' <a href="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG . '&tab=products' ) ) . '">' . esc_html__( 'Fix them in Products', 'leymish-ai-shopping-readiness' ) . '</a></p>';
+			}
+		}
+
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" id="lasr-feeds-form" class="lasr-card-box lasr-settings">';
+		wp_nonce_field( 'lasr_feeds_settings' );
+		echo '<input type="hidden" name="action" value="lasr_feeds_settings" /><h2>' . esc_html__( 'What to publish', 'leymish-ai-shopping-readiness' ) . '</h2>';
+		echo '<p><label><input type="checkbox" name="feeds" value="1" ' . checked( $on, true, false ) . ' /> ' . esc_html__( 'Product feeds for OpenAI and Google at stable addresses on your domain, rebuilt a minute after you save a product.', 'leymish-ai-shopping-readiness' ) . '</label></p>';
+		echo '<p><label><input type="checkbox" name="llms" value="1" ' . checked( LASR_Llms::enabled(), true, false ) . ' /> ' . esc_html__( 'A generated /llms.txt (your shop, top categories, policies and feed links). A real llms.txt file on your server always wins.', 'leymish-ai-shopping-readiness' ) . '</label></p>';
+		echo '<p><label><input type="checkbox" name="ucp" value="1" ' . checked( 'yes', $ucp['ucp'], false ) . ' /> ' . esc_html__( 'A UCP business profile at /.well-known/ucp. It says your store speaks the Universal Commerce Protocol; it declares no checkout service until a checkout integration adds one.', 'leymish-ai-shopping-readiness' ) . '</label></p>';
+		echo '<h2>' . esc_html__( 'Product schema', 'leymish-ai-shopping-readiness' ) . '</h2><p class="description">' . esc_html__( 'Added to the structured data on each product page, only from your own settings. Nothing is guessed.', 'leymish-ai-shopping-readiness' ) . '</p>';
+		echo '<p><label><input type="checkbox" name="identifiers" value="1" ' . checked( 'yes', $ucp['identifiers'], false ) . ' /> ' . esc_html__( 'Brand, GTIN and MPN (where a product has them and the page doesn\'t say yet).', 'leymish-ai-shopping-readiness' ) . '</label></p>';
+		echo '<fieldset><legend><label><input type="checkbox" name="returns" value="1" ' . checked( 'yes', $ucp['returns'], false ) . ' /> ' . esc_html__( 'Return policy', 'leymish-ai-shopping-readiness' ) . '</label></legend>';
+		echo '<p class="lasr-inline"><label>' . esc_html__( 'Days to return', 'leymish-ai-shopping-readiness' ) . ' <input type="number" min="0" max="365" name="return_days" value="' . esc_attr( (string) $ucp['return_days'] ) . '" class="small-text" /></label> ';
+		echo '<label>' . esc_html__( 'Return shipping', 'leymish-ai-shopping-readiness' ) . ' <select name="return_fees"><option value="free"' . selected( 'free', $ucp['return_fees'], false ) . '>' . esc_html__( 'free for the customer', 'leymish-ai-shopping-readiness' ) . '</option><option value="customer"' . selected( 'customer', $ucp['return_fees'], false ) . '>' . esc_html__( 'paid by the customer', 'leymish-ai-shopping-readiness' ) . '</option></select></label> ';
+		echo '<label>' . esc_html__( 'How', 'leymish-ai-shopping-readiness' ) . ' <select name="return_how"><option value="mail"' . selected( 'mail', $ucp['return_how'], false ) . '>' . esc_html__( 'by mail', 'leymish-ai-shopping-readiness' ) . '</option><option value="store"' . selected( 'store', $ucp['return_how'], false ) . '>' . esc_html__( 'in store', 'leymish-ai-shopping-readiness' ) . '</option></select></label></p>';
+		echo '<p class="description">' . esc_html__( '0 days means returns are not accepted. Match what your refund and returns page says.', 'leymish-ai-shopping-readiness' ) . '</p></fieldset>';
+		$rates = LASR_Ucp::zone_rates();
+		echo '<fieldset><legend><label><input type="checkbox" name="shipping" value="1" ' . checked( 'yes', $ucp['shipping'], false ) . ' /> ' . esc_html__( 'Shipping cost, from your WooCommerce shipping zones', 'leymish-ai-shopping-readiness' ) . '</label></legend>';
+		if ( $rates ) {
+			$parts = array();
+			foreach ( $rates as $country => $amount ) {
+				$parts[] = $country . ': ' . wp_strip_all_tags( wc_price( $amount ) );
+			}
+			/* translators: %s: countries and rates. */
+			echo '<p class="description">' . esc_html( sprintf( __( 'We\'d publish: %s. Only plain flat rates and free shipping without a minimum are used.', 'leymish-ai-shopping-readiness' ), implode( ', ', array_slice( $parts, 0, 10 ) ) ) ) . '</p>';
+		} else {
+			echo '<p class="description">' . esc_html__( 'No zone with a plain flat rate or free shipping was found, so nothing would be published.', 'leymish-ai-shopping-readiness' ) . '</p>';
+		}
+		echo '<p class="lasr-inline"><label>' . esc_html__( 'Handling, up to (days)', 'leymish-ai-shopping-readiness' ) . ' <input type="number" min="0" max="30" name="handling_max" value="' . esc_attr( (string) $ucp['handling_max'] ) . '" class="small-text" /></label> ';
+		echo '<label>' . esc_html__( 'Delivery, up to (days)', 'leymish-ai-shopping-readiness' ) . ' <input type="number" min="0" max="60" name="transit_max" value="' . esc_attr( (string) $ucp['transit_max'] ) . '" class="small-text" /></label></p></fieldset>';
+		submit_button( __( 'Save', 'leymish-ai-shopping-readiness' ) );
+		echo '</form>';
+		if ( $on ) {
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+			wp_nonce_field( 'lasr_rebuild' );
+			echo '<input type="hidden" name="action" value="lasr_rebuild" />';
+			submit_button( __( 'Rebuild feeds now', 'leymish-ai-shopping-readiness' ), 'secondary', 'submit', false );
+			echo '</form>';
+		}
+		if ( ! LASR_License::is_pro() ) {
+			echo '<section class="lasr-pro-preview lasr-card-box"><h3>' . esc_html__( 'Weekly validation with LeyMish Pro', 'leymish-ai-shopping-readiness' ) . '</h3><p>' . esc_html__( 'Every week Pro fetches your feeds and profile from outside, as OpenAI and Google do, and alerts you if they break or if your firewall blocks AI crawlers.', 'leymish-ai-shopping-readiness' ) . '</p>';
+			LASR_Plan::button( 'feeds' );
+			echo '</section>';
+		}
 	}
 }

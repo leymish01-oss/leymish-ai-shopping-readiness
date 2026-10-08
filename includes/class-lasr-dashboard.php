@@ -1,7 +1,7 @@
 <?php
 /**
- * The dashboard pieces shared by the Impact and Audit tabs (1.4.0): the score hero, the four category cards,
- * "Your biggest wins" and the "Free vs Pro for your store" panel.
+ * The dashboard pieces shared by the Overview and Audit tabs: the score hero, the four category cards and the wins.
+ * (2.0 dropped the 1.4 "Free vs Pro" panel: each tab now shows what Pro would do for this store, in place.)
  *
  * @package LeyMish_AI_Shopping_Readiness
  */
@@ -11,16 +11,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Pure helpers (grade, categories, verdict, wins, panel rows) plus their HTML. Charts are inline SVG, and every
+ * Pure helpers (grade, categories, verdict, wins) plus their HTML. Charts are inline SVG, and every
  * chart has its numbers in text or a screen-reader table next to it.
  */
 class LASR_Dashboard {
 
-	const DISMISS_META = 'lasr_pro_panel_dismissed';
-	const DISMISS_DAYS = 30;
-	const SITE         = 'https://www.leymish.com';
-	// WOOLAUNCH ($10 off Pro) runs until the end of 30 November 2026 (UTC); after that the line disappears by itself.
-	const LAUNCH_ENDS  = 1796083200;
+	const SITE = 'https://www.leymish.com';
 
 	/**
 	 * Letter grade for a score: A 90+, B 80+, C 65+, D 50+, F below.
@@ -239,14 +235,22 @@ class LASR_Dashboard {
 	}
 
 	/**
-	 * Our Pro page, tagged with where the click came from.
+	 * Where a fix happens: our own tab when the plugin can fix it here, otherwise the free guide.
 	 *
-	 * @param string $campaign fix-in-pro or free-vs-pro.
-	 * @param string $content  Check id or panel part.
+	 * @param string $id Check id.
 	 * @return string
 	 */
-	public static function pro_url( $campaign, $content = '' ) {
-		return self::SITE . '/woocommerce/pro.html?utm_source=plugin&utm_medium=dashboard&utm_campaign=' . rawurlencode( $campaign ) . ( '' !== $content ? '&utm_content=' . rawurlencode( $content ) : '' );
+	public static function fix_url( $id ) {
+		$tabs = array(
+			'catalog'  => 'products',
+			'jsonld'   => 'products',
+			'llms_txt' => 'feeds',
+			'ucp'      => 'feeds',
+		);
+		if ( isset( $tabs[ $id ] ) && class_exists( 'LASR_Admin' ) ) {
+			return admin_url( 'admin.php?page=' . LASR_Admin::SLUG . '&tab=' . $tabs[ $id ] );
+		}
+		return self::guide_url( $id );
 	}
 
 	/**
@@ -274,67 +278,6 @@ class LASR_Dashboard {
 			}
 		}
 		return $out;
-	}
-
-	/**
-	 * "Free vs Pro for your store" rows, built from this store's own numbers.
-	 *
-	 * @param array $result Last audit.
-	 * @return array[] what, free, pro.
-	 */
-	public static function panel_rows( array $result ) {
-		$gaps = self::identifier_gaps( isset( $result['products'] ) ? $result['products'] : array() );
-		$rows = array();
-		if ( $gaps > 0 ) {
-			$rows[] = array(
-				/* translators: %d: number of products. */
-				'what' => sprintf( _n( '%d product needs a GTIN, MPN or brand', '%d products need a GTIN, MPN or brand', $gaps, 'leymish-ai-shopping-readiness' ), $gaps ),
-				/* translators: %d: number of products. */
-				'free' => sprintf( _n( 'Edit %d product by hand', 'Edit %d products one by one', $gaps, 'leymish-ai-shopping-readiness' ), $gaps ),
-				'pro'  => __( 'One screen for all of them, GTIN check digits validated before saving', 'leymish-ai-shopping-readiness' ),
-			);
-		}
-		$rows[] = array(
-			'what' => __( 'Product feeds for OpenAI and Google', 'leymish-ai-shopping-readiness' ),
-			'free' => __( 'Not included', 'leymish-ai-shopping-readiness' ),
-			'pro'  => __( 'Both feeds on your own domain, rebuilt a minute after any product changes', 'leymish-ai-shopping-readiness' ),
-		);
-		$rows[] = array(
-			'what' => __( 'Keeping an eye on it', 'leymish-ai-shopping-readiness' ),
-			'free' => __( 'Run the audit when you remember', 'leymish-ai-shopping-readiness' ),
-			'pro'  => __( 'A weekly re-audit email', 'leymish-ai-shopping-readiness' ),
-		);
-		$rows[] = array(
-			'what' => __( 'Showing the work', 'leymish-ai-shopping-readiness' ),
-			'free' => __( 'This Impact tab', 'leymish-ai-shopping-readiness' ),
-			'pro'  => __( 'A before/after report and an llms.txt generator', 'leymish-ai-shopping-readiness' ),
-		);
-		return $rows;
-	}
-
-	/**
-	 * Whether the WOOLAUNCH line is still true.
-	 *
-	 * @param int|null $now Unix time.
-	 * @return bool
-	 */
-	public static function launch_offer_active( $now = null ) {
-		return ( null === $now ? time() : (int) $now ) < self::LAUNCH_ENDS;
-	}
-
-	/**
-	 * The panel shows only without Pro, and not for 30 days after this user dismissed it.
-	 *
-	 * @param int|null $dismissed_at When this user dismissed it (0 = never).
-	 * @param int|null $now          Unix time.
-	 * @return bool
-	 */
-	public static function panel_due( $dismissed_at, $now = null ) {
-		if ( defined( 'LASR_PRO_VERSION' ) ) {
-			return false;
-		}
-		$now = null === $now ? time() : (int) $now;
-		return ! $dismissed_at || ( $now - (int) $dismissed_at ) >= self::DISMISS_DAYS * DAY_IN_SECONDS;
 	}
 
 	/* ---------------------------------------------------------------- HTML */
@@ -461,7 +404,7 @@ class LASR_Dashboard {
 	}
 
 	/**
-	 * The fix list with a free-guide button and, only where Pro has a tool for it, a Pro button.
+	 * The fix list: "Fix it here" where this plugin fixes it, and the free guide for every fix.
 	 *
 	 * @param array[] $wins From wins().
 	 */
@@ -482,49 +425,11 @@ class LASR_Dashboard {
 			}
 			echo '</div><p class="lasr-detail">' . esc_html( $w['fix'] ) . '</p><p class="lasr-win-actions">';
 			echo '<a class="button" href="' . esc_url( self::guide_url( $w['id'] ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'How to fix it free', 'leymish-ai-shopping-readiness' ) . '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)', 'leymish-ai-shopping-readiness' ) . '</span></a>';
-			if ( $w['pro'] && ! defined( 'LASR_PRO_VERSION' ) ) {
-				echo ' <a class="button lasr-pro-link" href="' . esc_url( self::pro_url( 'fix-in-pro', $w['id'] ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'Fix it in Pro', 'leymish-ai-shopping-readiness' ) . '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)', 'leymish-ai-shopping-readiness' ) . '</span></a>';
+			if ( self::fix_url( $w['id'] ) !== self::guide_url( $w['id'] ) ) {
+				echo ' <a class="button button-primary" href="' . esc_url( self::fix_url( $w['id'] ) ) . '">' . esc_html__( 'Fix it here', 'leymish-ai-shopping-readiness' ) . '</a>';
 			}
 			echo '</p></li>';
 		}
 		echo '</ol>';
-	}
-
-	/**
-	 * "Free vs Pro for your store". Only on our screens, only without Pro, dismissible for 30 days.
-	 *
-	 * @param array $result Last audit.
-	 */
-	public static function panel( array $result ) {
-		if ( ! self::panel_due( (int) get_user_meta( get_current_user_id(), self::DISMISS_META, true ) ) ) {
-			return;
-		}
-		echo '<section class="lasr-panel" aria-labelledby="lasr-panel-h"><h2 id="lasr-panel-h">' . esc_html__( 'Free vs Pro for your store', 'leymish-ai-shopping-readiness' ) . '</h2>';
-		echo '<table class="widefat lasr-panel-table"><thead><tr><th scope="col"><span class="screen-reader-text">' . esc_html__( 'What', 'leymish-ai-shopping-readiness' ) . '</span></th><th scope="col">' . esc_html__( 'Free (this plugin)', 'leymish-ai-shopping-readiness' ) . '</th><th scope="col">' . esc_html__( 'Pro add-on', 'leymish-ai-shopping-readiness' ) . '</th></tr></thead><tbody>';
-		foreach ( self::panel_rows( $result ) as $r ) {
-			echo '<tr><th scope="row">' . esc_html( $r['what'] ) . '</th><td>' . esc_html( $r['free'] ) . '</td><td>' . esc_html( $r['pro'] ) . '</td></tr>';
-		}
-		echo '</tbody></table><p class="lasr-price"><strong>' . esc_html__( '$29 once per store', 'leymish-ai-shopping-readiness' ) . '</strong>, ' . esc_html__( 'updates included, refund within 14 days.', 'leymish-ai-shopping-readiness' );
-		if ( self::launch_offer_active() ) {
-			echo ' ' . esc_html__( 'Code WOOLAUNCH takes $10 off until 30 November 2026.', 'leymish-ai-shopping-readiness' );
-		}
-		echo '</p><div class="lasr-panel-actions"><a class="button" href="' . esc_url( self::pro_url( 'free-vs-pro', 'panel' ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'See Pro', 'leymish-ai-shopping-readiness' ) . '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)', 'leymish-ai-shopping-readiness' ) . '</span></a>';
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-		wp_nonce_field( 'lasr_dismiss_panel' );
-		echo '<input type="hidden" name="action" value="lasr_dismiss_panel" /><button type="submit" class="button-link">' . esc_html__( 'Hide this for 30 days', 'leymish-ai-shopping-readiness' ) . '</button></form></div>';
-		echo '<p class="description">' . esc_html__( 'The free plugin keeps every check and feature either way. Nothing here is locked.', 'leymish-ai-shopping-readiness' ) . '</p></section>';
-	}
-
-	/**
-	 * Hide the panel for this user for 30 days.
-	 */
-	public static function handle_dismiss() {
-		if ( ! current_user_can( 'manage_woocommerce' ) ) {
-			wp_die( esc_html__( 'You do not have permission to do that.', 'leymish-ai-shopping-readiness' ) );
-		}
-		check_admin_referer( 'lasr_dismiss_panel' );
-		update_user_meta( get_current_user_id(), self::DISMISS_META, time() );
-		wp_safe_redirect( admin_url( 'admin.php?page=' . LASR_Admin::SLUG ) );
-		exit;
 	}
 }

@@ -32,7 +32,6 @@ class LASR_Onboarding {
 
 	const DISMISSED = 'lasr_onboarding_done';
 	const SUBSCRIBED = 'lasr_tips_subscribed';
-	const API = 'https://leymish-ai.leymish.workers.dev/v1/check/subscribe';
 	const SAMPLE = 'https://playground.wordpress.net/?blueprint-url=https://www.leymish.com/woocommerce/downloads/sample-store.json';
 
 	/**
@@ -77,8 +76,8 @@ class LASR_Onboarding {
 			esc_html__( 'It requests a few of your own pages the way each AI crawler does, and scores what it finds. Everything stays on your server.', 'leymish-ai-shopping-readiness' ) . '</li>';
 		echo '<li><strong>' . esc_html__( 'Fix your top three.', 'leymish-ai-shopping-readiness' ) . '</strong> ' .
 			esc_html__( 'The audit sorts what it found by how much it costs you and how long it takes to fix. The first three are usually an afternoon.', 'leymish-ai-shopping-readiness' ) . '</li>';
-		echo '<li><strong>' . esc_html__( 'Run it again and open Impact.', 'leymish-ai-shopping-readiness' ) . '</strong> ' .
-			esc_html__( 'Impact shows your score over time and exactly which checks changed, so you can see whether the work landed.', 'leymish-ai-shopping-readiness' ) . '</li>';
+		echo '<li><strong>' . esc_html__( 'Run it again and look at the Overview.', 'leymish-ai-shopping-readiness' ) . '</strong> ' .
+			esc_html__( 'The Overview shows your score over time and exactly which checks changed, so you can see whether the work landed.', 'leymish-ai-shopping-readiness' ) . '</li>';
 		echo '</ol>';
 		echo '<p><a href="' . esc_url( self::SAMPLE ) . '" target="_blank" rel="noopener">' .
 			esc_html__( 'Prefer to try it on a sample store first?', 'leymish-ai-shopping-readiness' ) .
@@ -139,19 +138,17 @@ class LASR_Onboarding {
 			wp_safe_redirect( add_query_arg( 'lasr_sub', 'need_consent', $back ) );
 			exit;
 		}
-		$r = wp_remote_post(
-			self::API,
+		$r  = LASR_Service::post(
+			'/v1/check/subscribe',
 			array(
-				'timeout' => 15,
-				'headers' => array( 'Content-Type' => 'application/json' ),
-				'body'    => wp_json_encode( array(
-					'email'   => $email,
-					'domain'  => wp_parse_url( home_url(), PHP_URL_HOST ),
-					'consent' => true,
-				) ),
-			)
+				'email'   => $email,
+				'domain'  => wp_parse_url( home_url(), PHP_URL_HOST ),
+				'consent' => true,
+			),
+			'',
+			15
 		);
-		$ok = ! is_wp_error( $r ) && 200 === (int) wp_remote_retrieve_response_code( $r );
+		$ok = 200 === $r['status'];
 		if ( $ok ) {
 			update_option( self::SUBSCRIBED, time(), false );
 		}

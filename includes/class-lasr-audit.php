@@ -312,6 +312,9 @@ class LASR_Audit {
 		}
 		$keys = apply_filters( 'lasr_gtin_meta_keys', array( '_global_unique_id', '_lasr_gtin', '_gtin', '_wpm_gtin_code', 'hwp_product_gtin', '_barcode', '_ean' ) );
 		foreach ( $keys as $key ) {
+			if ( '_global_unique_id' === $key && method_exists( $product, 'get_global_unique_id' ) ) {
+				continue; // WooCommerce 9.2+ owns this key (read above); reading it as meta is flagged as doing it wrong
+			}
 			$v = (string) $product->get_meta( $key, true );
 			if ( '' !== $v ) {
 				return $v;
@@ -825,9 +828,9 @@ class LASR_Audit {
 	 */
 	private static function protocol_versions() {
 		return array(
-			'ucp'     => '2026-01-23',  // ucp.dev latest specification at the time of writing
+			'ucp'     => '2026-08-25',  // ucp.dev latest specification at the time of writing (re-read 2026-10-08)
 			'acp'     => '2026-04-17',  // latest stable spec folder in the ACP repository
-			'checked' => '2026-10-07',  // when we last read both specs
+			'checked' => '2026-10-08',  // when we last read both specs
 		);
 	}
 
@@ -880,6 +883,20 @@ class LASR_Audit {
 
 		$valid   = empty( $problems );
 		$version = $valid && isset( $ucp['version'] ) ? sanitize_text_field( (string) $ucp['version'] ) : '';
+		// 2.0: a valid profile that declares no services is honest (no UCP checkout yet) but only half the way there.
+		$empty = $valid && empty( $ucp['services'] );
+		if ( $empty ) {
+			return self::check(
+				'ucp',
+				$label,
+				'warn',
+				0.5,
+				/* translators: 1: the store's UCP version, 2: the spec version we checked against. */
+				sprintf( __( 'Valid UCP profile (version %1$s) that declares no checkout services yet, so agents can find you but not check out through UCP. Checked against the UCP specification of %2$s.', 'leymish-ai-shopping-readiness' ), $version, $v['ucp'] ),
+				__( 'Your profile is in place. The other half needs a checkout integration that implements UCP and adds its service to the profile. WooCommerce core does not have one yet, so this is worth watching, not urgent.', 'leymish-ai-shopping-readiness' ),
+				3
+			);
+		}
 		return self::check(
 			'ucp',
 			$label,

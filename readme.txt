@@ -1,49 +1,46 @@
-=== LeyMish AI Shopping Readiness ===
+=== LeyMish AI Readiness ===
 Contributors: leymish
-Tags: gtin, chatgpt, ai shopping, structured data, woocommerce seo
+Tags: gtin, chatgpt, ai shopping, product feed, structured data
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.4.1
+Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-See if ChatGPT and AI shopping agents can read your WooCommerce store: a 0–100 score, a fix list, and what improved since you started.
+Can ChatGPT, Google and Perplexity read your WooCommerce products? A 0–100 audit, one-click fixes and feeds, free.
 
 == Description ==
 
-Shopify stores became visible in ChatGPT and other AI shopping assistants by default in March 2026. WooCommerce stores don't get that automatically. Whichever route you take (product feeds, a third-party catalog, or future WooCommerce features), the same basics decide whether AI agents can read and trust your products. This plugin checks them in one place.
+Shoppers now ask AI assistants what to buy. ChatGPT, Google and Perplexity match products by barcode (GTIN), brand and maker's part number (MPN), and they read your product pages, your store's product API and your feeds. Products they can't read are left out. LeyMish AI Readiness shows what they see and fixes it, from one **LeyMish** menu with eight tabs.
 
-**WooCommerce → AI Readiness** runs the audit and shows:
+**Free, and it all runs on your site:**
 
-* A **0–100 score** and a **fix list** ordered by how many points each fix is worth.
-* A table of every check with what was found.
-* The **products with the most gaps**, plus a **CSV export** of every product's gaps.
-* An **Impact** tab: your score week by week, the checks you've fixed since you started, how many products now have a GTIN or MPN, a brand and image alt text compared with your first audit, and what to fix next. Stored on your site only.
+* **Overview:** a 0–100 score with a grade and one plain sentence, four area cards, your next three wins, what changed this week, your score over time and a before/after report you can send to a client.
+* **Audit:** every check (robots.txt for each AI crawler, real blocking by firewalls, product structured data, readable without JavaScript, Store API, guest checkout, llms.txt, UCP) with plain-words fixes and a CSV.
+* **Products:** published products by default, a status and "what's missing" for each, an inline editor for GTIN, brand and MPN with check-digit validation as you type, and one-click fixes with a preview and an undo: "Set brand for all", "I make these products: use each SKU as the MPN" (only with your explicit tick), and GTINs from your supplier's CSV. A GTIN is never invented.
+* **See it the way AI sees it:** pick a product and see what an AI shopping agent can read from its page and its API, missing fields in red, present in green.
+* **Feeds:** OpenAI (JSONL) and Google Merchant Center (TSV) product feeds at stable addresses on your domain, a generated llms.txt, a UCP business profile at /.well-known/ucp, and richer product schema (brand, GTIN, MPN, your return policy and plain shipping rates), each switched on by you and built only from your own settings.
+* **Weekly re-audit:** alerts when products lose identifiers, AI crawlers get blocked in robots.txt, or a feed fails, and an email from your own site.
 
-= What it checks =
+**Optional LeyMish Pro services ($12 a month or $99 a year per store; agencies $39 a month for up to 10 stores):**
 
-* **Product data:** valid GTIN (with check digit) or MPN, brand, price, stock status, main image, a real description, key attributes, and complete variations (each with its own price and attribute values).
-* **robots.txt** rules for GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-SearchBot, Claude-User, PerplexityBot, Perplexity-User and Google-Extended.
-* **Real blocking:** requests one of your product pages with each AI crawler's user agent and compares the result with a normal browser request. This catches security plugins and CDN or firewall rules that robots.txt doesn't show. (A CDN that verifies bots by IP address may block this test while allowing the real crawler, so results are labelled "possible block" for you to confirm.)
-* **Product structured data (JSON-LD)** on your real product pages: required fields, plus identifier and brand.
-* **Name and price readable without JavaScript**, since most AI crawlers don't run JavaScript.
-* **WooCommerce Store API** reachable, **guest checkout** enabled, **llms.txt** present, and a **UCP profile** at /.well-known/ucp.
-* WooCommerce **MCP** availability (shown for information; it's for store-management assistants and doesn't affect the score).
+* **AI visibility:** your shoppers' own questions (drafted from your categories, edited by you) asked to a search-grounded AI model every week: are you cited, which sites are cited instead, and the trend. Every free store gets one check of 3 questions.
+* **AI fixes:** attributes, image alt text, a Google category and a clearer description, drafted only from the product's own page, shown as Now vs Proposed and saved only when you approve. Free stores get 20 to try; Pro includes 500 a month.
+* **Outside monitoring:** every week LeyMish fetches your store, feeds and profile from outside, as OpenAI and Google do, and alerts you when a firewall or CDN blocks AI crawlers or a feed breaks.
+* **Store Team:** a CEO agent writes your store's weekly plan (free); on Pro, the Catalog and Reporting agents do the work and every change waits in the Approvals inbox until you approve it.
 
-= Private by design =
+Pro is a service: the licence only unlocks calls to LeyMish's service. Nothing that runs on your site is locked. Upgrading takes a minute: the Plan tab opens checkout and switches Pro on by itself when the purchase arrives.
 
-Everything runs on your own site. The plugin does not connect to any external service and sends no data anywhere: its only HTTP requests go to your own store's URLs (for example your robots.txt and a few product pages). No account, no sign-up, no tracking.
+= Updating from Pro or Store Team =
 
-= Optional Pro add-on =
-
-A separately sold Pro add-on adds a bulk editor for GTIN, brand and MPN, OpenAI and Google Merchant Center product feeds on your own domain, an llms.txt generator, a weekly re-audit email and score history. This free plugin is complete on its own and never limits the audit.
+LeyMish AI Readiness Pro and LeyMish Store Team are now built in. When you update, your licence, settings, Store Team connection, feeds and history move over, the old plugins are switched off, and you can delete them.
 
 == Installation ==
 
 1. Install and activate WooCommerce, then this plugin.
-2. Go to **WooCommerce → AI Readiness** and click **Run the audit**.
-3. Work through the fix list from the top. Re-run the audit to see your score change.
+2. Open **LeyMish** in the admin menu and click **Run the audit**.
+3. Work through "Your next 3 wins". The Products tab fixes most of them in a few clicks.
 
 Developers can also run `wp lasr audit` (add `--format=json` for machine-readable output).
 
@@ -51,23 +48,15 @@ Developers can also run `wp lasr audit` (add `--format=json` for machine-readabl
 
 = Is it really free? =
 
-Yes. The audit, the fix list, the Impact tab and the CSV export are free and never limited. An optional, separately sold Pro add-on adds tools that do some of the fixing for you.
+Yes. The audit, the Products tab and its one-click fixes, the feeds, llms.txt, the UCP profile, product schema, the weekly re-audit and the report are free and never limited. LeyMish Pro adds services that run on our side: AI visibility, AI fixes, outside monitoring and Store Team agents.
 
 = Does it send my store's data anywhere? =
 
-No. Everything runs on your own site. Its only web requests go to your own store's pages (for example robots.txt and a few product pages), to see what AI crawlers receive.
-
-= What does the Impact tab show? =
-
-Your score week by week, the checks you've fixed since your first audit, and how many products have a GTIN or MPN, a brand and image alt text compared with when you started. It's stored on your site only.
-
-= Will it slow down my store? =
-
-No. The audit runs only when you click the button in your admin, and the plugin adds nothing to your shop's pages.
+Not unless you use a LeyMish service, and each one says what it sends before you use it. The audit, the editor and the feeds run entirely on your site. See "External services" below for every call, what it sends and when.
 
 = Does this put my products in ChatGPT? =
 
-No plugin can guarantee that. OpenAI, Google and others decide what they show. This plugin tells you what stops AI agents reading and trusting your products, and how to fix it.
+No plugin can guarantee that. OpenAI, Google and others decide what they show. This plugin fixes what commonly keeps products out, using only facts from your own store.
 
 = Why does a check say "Not tested"? =
 
@@ -77,47 +66,49 @@ Your server couldn't request its own pages (a "loopback" request). Tools → Sit
 
 GTIN: WooCommerce's own "GTIN, UPC, EAN, or ISBN" field (WooCommerce 9.2+) or common plugin fields. Brand: WooCommerce Brands (9.6+), popular brand plugins, a "Brand" attribute, or custom fields. Developers can add sources with the `lasr_gtin_meta_keys`, `lasr_mpn_meta_keys` and `lasr_brand_taxonomies` filters.
 
+= Why does my UCP profile say "no checkout services"? =
+
+WooCommerce core doesn't implement a UCP checkout yet, so the profile honestly declares none. A checkout integration that implements UCP can add its services with the `lasr_ucp_profile` filter. The audit gives a profile without services half the points.
+
 = How many products does it check? =
 
 The first 500 published products. Developers can change this with the `lasr_product_limit` filter.
 
 == Screenshots ==
 
-1. The dashboard: your score, grade and trend, and four cards for Access, Product data, Store API and AI checkout readiness.
-2. Your biggest wins, each with a link to a free guide, then your score week by week.
-3. Every check, grouped by area, with what was found.
-4. Products with gaps, opened, and the CSV export.
-5. Pro add-on: bulk editor for GTIN, brand and MPN, checking each GTIN as you type.
-6. Pro add-on: feed status for OpenAI and Google, llms.txt, weekly email and score history.
+1. Overview: your score, grade, the three answers (what's wrong, what we fixed, what to do next) and four area cards.
+2. Products: "See it the way AI sees it", missing fields in red and present in green, then the one-click fixes.
+3. Products: status and what's missing for each product, with GTIN check digits validated as you type.
+4. Feeds: OpenAI and Google feeds, llms.txt, the UCP profile and product schema, each switched on by you.
+5. AI visibility: your shoppers' questions, whether AI answers cite your store, and who they cite instead.
+6. Plan: what's free, what LeyMish Pro adds, and the one-click upgrade.
 
 == External services ==
 
-The audit itself runs entirely on your own server: it requests your own pages the way an AI crawler would and
-scores what it finds. Nothing about your store is sent anywhere, and the plugin works with no internet
-connection beyond your own site.
+The audit, the Products tab, the feeds, llms.txt, the UCP profile, product schema, the weekly re-audit and the report run entirely on your own server. They make no requests except to your own store's pages.
 
-There is exactly one optional feature that contacts us, and only after you tick a box and press a button:
+Some optional features use the LeyMish service at https://leymish-ai.leymish.workers.dev, run by LeyMish Labs (14 Jenkins St, Rosewater SA 5013, Australia). Terms: https://www.leymish.com/terms.html. Privacy: https://www.leymish.com/privacy.html. Nothing is sent on activation, on an audit or on a plain page view: each call below happens only after you act, and says so on screen.
 
-**The weekly store tip (optional, off by default)**
+* **Licence check** (/v1/license/check, /v1/pro/status): when you activate a LeyMish Pro licence, and weekly while one is active. Sends the licence key and your store's address. LeyMish checks the key with its payment provider (Gumroad).
+* **One-click upgrade** (/v1/claim/start, /v1/claim/poll): when you click "Upgrade", and while that tab waits for your purchase. Sends your store's address; checkout opens at Gumroad (https://gumroad.com, terms https://gumroad.com/terms, privacy https://gumroad.com/privacy) with a one-time claim ID, so the new licence can be matched to your store.
+* **AI visibility** (/v1/visibility/check): when you tick the box and run a check, and weekly on Pro. Sends your questions, your store's name and address. LeyMish asks a search-grounded AI model through OpenRouter (https://openrouter.ai, privacy https://openrouter.ai/privacy) and returns which sites are cited. Questions and answers are not stored by LeyMish; the results are kept on your site.
+* **AI fixes** (/v1/fix, /v1/usage): only after you tick the consent box, and only for the product you click. Sends that product's name, descriptions, attributes, categories and main image address. LeyMish asks Anthropic's Claude (https://www.anthropic.com, privacy https://www.anthropic.com/legal/privacy) for a draft. No customer or order data is sent; LeyMish keeps counters, not product text.
+* **Outside monitoring** (/v1/monitor): weekly, on Pro only. Sends your store's address; LeyMish then requests your home page, robots.txt, product API, llms.txt, feeds and UCP profile from outside, including as AI crawlers would, at most once a day.
+* **Store Team** (/v1/team/...): only after you click "Connect" and approve on WooCommerce's own screen. WooCommerce sends LeyMish a REST API key for your store, stored encrypted; the agents read your catalogue and propose changes, and nothing is written without your approval. The live demo loads public data about our partner store only when you click "Show the live demo". Disconnect deletes LeyMish's copy of the key.
+* **The weekly store tip** (/v1/check/subscribe, optional, off by default): only when you tick the box, enter an email address and submit. Sends that address, your site's domain and your consent. Every email has an unsubscribe link, and unsubscribing deletes the record.
 
-* What it is: on the AI Readiness screen there is an unticked checkbox offering a weekly email with one thing
-  to fix on a WooCommerce store, plus your latest readiness score.
-* When data is sent: only when you tick that box, enter an email address and submit the form. Never on
-  activation, never on an audit, never in the background.
-* What is sent: the email address you type, your site's domain name, and the fact that you consented (with the
-  exact wording you agreed to and the time). Nothing else. Your products, scores and audit results are not sent.
-* Where it goes: the LeyMish Labs service at https://leymish-ai.leymish.workers.dev/v1/check/subscribe, run by
-  LeyMish Labs (14 Jenkins St, Rosewater SA 5013, Australia).
-* What we do with it: send you those emails. The score in them comes from our free outside check of your
-  public pages (at most 6 requests a week, obeying your robots.txt), not from the plugin. We do not sell or
-  share your address. Every email has an unsubscribe link, and unsubscribing deletes the record.
-* Terms and privacy: https://www.leymish.com/terms.html and https://www.leymish.com/privacy.html
-
-The "try it on a sample store" link opens WordPress Playground (https://playground.wordpress.net), a service
-run by the WordPress project that builds a throwaway WordPress in your own browser. It is an ordinary link:
-following it sends nothing about your site, and nothing is installed here.
+The "try it on a sample store" link opens WordPress Playground (https://playground.wordpress.net), a service run by the WordPress project that builds a throwaway WordPress in your own browser. It is an ordinary link: following it sends nothing about your site.
 
 == Changelog ==
+
+= 2.0.0 =
+* One plugin, one menu: **LeyMish** sits right after WooCommerce with eight tabs (Overview, Audit, Products, Feeds, AI visibility, AI fixes, Team, Plan). Every tab opens with what's wrong, what we fixed and what to do next.
+* Pro and Store Team are built in. Updating moves your licence, settings, Store Team connection, feeds and history over and switches the old plugins off.
+* Products tab: published products by default (drafts and private behind a filter), a status and "what's missing" for each product, one-click fixes with a preview and an undo ("Set brand for all", SKU as MPN for private label, GTINs from a supplier CSV), and "See it the way AI sees it".
+* Free now: OpenAI and Google feeds (same addresses as Pro 1.x), llms.txt, a UCP business profile, product schema enrichment from your own settings (brand, GTIN, MPN, return policy, shipping), the weekly re-audit with alerts, and the before/after report.
+* New LeyMish Pro services: AI visibility (one free check for every store), outside monitoring, and Store Team agents; AI fixes moved into their own tab.
+* One-click upgrade from the Plan tab; pasting a key still works. Old Pro keys keep working.
+* The UCP check follows the 2026-08-25 specification; a valid profile without services now scores half the points.
 
 = 1.4.1 =
 * The menu and page are now called "LeyMish AI Readiness".

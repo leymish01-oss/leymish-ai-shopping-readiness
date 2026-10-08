@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name:          LeyMish AI Shopping Readiness
+ * Plugin Name:          LeyMish AI Readiness
  * Plugin URI:           https://www.leymish.com/woocommerce/
- * Description:          Checks whether AI shopping agents (ChatGPT, Claude, Perplexity, Google) can find, read and trust your WooCommerce products. A 0–100 score, a prioritised fix list and a CSV export. Runs entirely on your site.
- * Version:              1.4.1
+ * Description:          Can ChatGPT, Google and Perplexity find, read and trust your WooCommerce products? A 0–100 audit, a products editor with one-click fixes, OpenAI and Google feeds, llms.txt, a UCP profile and richer product schema, all running on your site, free. Optional LeyMish Pro services: AI visibility checks, AI fixes you approve, outside monitoring and the Store Team agents.
+ * Version:              2.0.0
  * Requires at least:    6.4
  * Requires PHP:         7.4
  * Requires Plugins:     woocommerce
@@ -23,19 +23,32 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'LASR_VERSION', '1.4.1' );
+define( 'LASR_VERSION', '2.0.0' );
 define( 'LASR_FILE', __FILE__ );
 define( 'LASR_DIR', plugin_dir_path( __FILE__ ) );
 
 register_activation_hook( __FILE__, 'lasr_activate' );
+register_deactivation_hook( __FILE__, 'lasr_deactivate' );
 
 /**
- * First activation only (no audit yet): show one welcome notice on the Plugins screen.
+ * First activation only (no audit yet): one welcome notice on the Plugins screen. Feed, llms.txt and UCP addresses
+ * are registered on the next request, when their rules are added.
  */
 function lasr_activate() {
 	if ( ! get_option( 'lasr_last_audit' ) ) {
 		add_option( 'lasr_welcome', 1, '', false );
 	}
+	delete_option( 'lasr_db_version' ); // lets the migration and the rewrite flush run once on the next request
+}
+
+/**
+ * Remove scheduled jobs and our addresses.
+ */
+function lasr_deactivate() {
+	foreach ( array( 'lasr_weekly', 'lasr_license_recheck', 'lasr_rebuild_feeds', 'lasr_visibility_weekly' ) as $hook ) {
+		wp_clear_scheduled_hook( $hook );
+	}
+	flush_rewrite_rules();
 }
 
 require_once LASR_DIR . 'includes/class-lasr-gtin.php';
@@ -63,14 +76,27 @@ function lasr_boot() {
 		add_action( 'admin_notices', 'lasr_notice_needs_woocommerce' );
 		return;
 	}
-	require_once LASR_DIR . 'includes/class-lasr-audit.php';
-	require_once LASR_DIR . 'includes/class-lasr-impact.php';
-	LASR_Impact::init(); // records a snapshot after every audit, including WP-CLI and Pro's weekly run
+	foreach ( array( 'service', 'audit', 'impact', 'license', 'feeds', 'llms', 'ucp', 'worklog', 'schedule', 'visibility', 'team', 'migrate' ) as $part ) {
+		require_once LASR_DIR . 'includes/class-lasr-' . $part . '.php';
+	}
+	LASR_Impact::init(); // records a snapshot after every audit, including WP-CLI and the weekly run
+	LASR_License::init();
+	LASR_Feeds::init();
+	LASR_Llms::init();
+	LASR_Ucp::init();
+	LASR_Schedule::init();
+	LASR_Visibility::init();
+	LASR_Migrate::init();
 	if ( is_admin() ) {
-		require_once LASR_DIR . 'includes/class-lasr-admin.php';
-		require_once LASR_DIR . 'includes/class-lasr-dashboard.php';
-		require_once LASR_DIR . 'includes/class-lasr-onboarding.php';
+		foreach ( array( 'admin', 'dashboard', 'onboarding', 'products', 'ai-logic', 'ai', 'plan' ) as $part ) {
+			require_once LASR_DIR . 'includes/class-lasr-' . $part . '.php';
+		}
 		LASR_Admin::init();
+		LASR_Products::init();
+		LASR_AI::init();
+		LASR_Team::init();
+		LASR_Plan::init();
+		LASR_Worklog::init();
 	}
 	if ( defined( 'WP_CLI' ) && WP_CLI ) {
 		require_once LASR_DIR . 'includes/class-lasr-cli.php';
@@ -85,5 +111,5 @@ function lasr_notice_needs_woocommerce() {
 	if ( ! current_user_can( 'activate_plugins' ) ) {
 		return;
 	}
-	echo '<div class="notice notice-warning"><p>' . esc_html__( 'LeyMish AI Shopping Readiness needs WooCommerce to be active.', 'leymish-ai-shopping-readiness' ) . '</p></div>';
+	echo '<div class="notice notice-warning"><p>' . esc_html__( 'LeyMish AI Readiness needs WooCommerce to be active.', 'leymish-ai-shopping-readiness' ) . '</p></div>';
 }
