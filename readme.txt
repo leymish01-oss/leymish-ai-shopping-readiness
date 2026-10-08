@@ -4,7 +4,7 @@ Tags: gtin, chatgpt, ai shopping, structured data, woocommerce seo
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -83,12 +83,12 @@ The first 500 published products. Developers can change this with the `lasr_prod
 
 == Screenshots ==
 
-1. The Impact tab: your score week by week, the checks you fixed and your product data then vs now.
-2. The score and the fix list, ordered by points.
-3. Every check with what was found.
-4. Products with the most gaps, and the CSV export.
-5. Pro add-on: bulk editor for GTIN, brand and MPN.
-6. Pro add-on: product feed URLs, llms.txt, weekly email and score history.
+1. The dashboard: your score, grade and trend, and four cards for Access, Product data, Store API and AI checkout readiness.
+2. Your biggest wins, each with a link to a free guide, then your score week by week.
+3. Every check, grouped by area, with what was found.
+4. Products with gaps, opened, and the CSV export.
+5. Pro add-on: bulk editor for GTIN, brand and MPN, checking each GTIN as you type.
+6. Pro add-on: feed status for OpenAI and Google, llms.txt, weekly email and score history.
 
 == External services ==
 
@@ -118,6 +118,13 @@ run by the WordPress project that builds a throwaway WordPress in your own brows
 following it sends nothing about your site, and nothing is installed here.
 
 == Changelog ==
+
+= 1.4.0 =
+* A clearer dashboard: a score gauge with a grade and one plain sentence about where your store stands, your trend, and four cards for Access, Product data, Store API and AI checkout readiness.
+* "Your biggest wins": the top three fixes, how many products each one affects, and a link to our free guide for each.
+* "Free vs Pro for your store", built from your own numbers, on this screen only. Hide it for 30 days with one click. Nothing in the free plugin is locked.
+* The products table now lists only products with gaps, collapsed until you open it; the CSV still has every product.
+* Charts have their numbers in text for screen readers; the screen works at phone width.
 
 = 1.3.0 =
 * A three-step checklist on first run: run the audit, fix your top three, see Impact. It disappears once you have run an audit, and you can hide it at any time.

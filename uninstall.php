@@ -15,3 +15,4 @@ delete_option( 'lasr_baseline' );
 delete_option( 'lasr_review_asked' );
 delete_option( 'lasr_onboarding_done' );   // first-run checklist (1.3.0)
 delete_option( 'lasr_tips_subscribed' );   // weekly-tip opt-in (1.3.0)
+delete_metadata( 'user', 0, 'lasr_pro_panel_dismissed', '', true ); // "Free vs Pro" panel hidden for 30 days (1.4.0)

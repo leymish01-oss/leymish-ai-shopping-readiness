@@ -1,43 +1,113 @@
-.lasr-wrap { max-width: 1100px; }
+/* LeyMish AI Shopping Readiness: our screen only (WooCommerce → AI Readiness). WordPress admin colours;
+   text contrast is WCAG AA, chart strokes are at least 3:1 against white. */
+.lasr-wrap { max-width: 1100px; --lasr-accent: var(--wp-admin-theme-color, #2271b1); --lasr-good: #00a32a; --lasr-fair: #996800; --lasr-poor: #d63638; --lasr-line: #dcdcde; --lasr-muted: #50575e; }
 .lasr-lede { font-size: 14px; max-width: 70ch; }
 .lasr-run { margin: 16px 0 24px; }
-.lasr-score { display: inline-flex; align-items: baseline; gap: 16px; padding: 16px 22px; border-radius: 10px; background: #fff; border: 1px solid #dcdcde; margin-bottom: 8px; }
-.lasr-number { font-size: 48px; font-weight: 700; line-height: 1; }
-.lasr-number span { font-size: 18px; color: #646970; font-weight: 400; }
-.lasr-band-good .lasr-number { color: #1a7f37; }
-.lasr-band-fair .lasr-number { color: #9a6700; }
-.lasr-band-poor .lasr-number { color: #b32d2e; }
-.lasr-when { color: #646970; }
-.lasr-fixes li { margin-bottom: 12px; max-width: 80ch; }
-.lasr-gain { color: #135e28; font-weight: 600; margin-left: 6px; }
-.lasr-detail { color: #50575e; }
-.lasr-table { margin: 8px 0 20px; }
+.lasr-run .description { margin-left: 8px; }
+.nav-tab-wrapper { margin-bottom: 16px; }
+.lasr-empty { max-width: 70ch; padding: 8px 0; }
+
+/* Hero: gauge + grade + verdict + trend + run button */
+.lasr-hero { display: flex; flex-wrap: wrap; align-items: center; gap: 20px 28px; background: #fff; border: 1px solid var(--lasr-line); border-radius: 8px; padding: 20px 24px; margin: 0 0 16px; }
+.lasr-score { flex: 0 0 auto; }
+.lasr-gauge { position: relative; width: 136px; height: 136px; }
+.lasr-gauge svg { width: 100%; height: 100%; display: block; }
+.lasr-gauge-track { fill: none; stroke: #f0f0f1; stroke-width: 12; }
+.lasr-gauge-fill { fill: none; stroke: var(--lasr-accent); stroke-width: 12; stroke-linecap: round; }
+.lasr-band-good .lasr-gauge-fill { stroke: var(--lasr-good); }
+.lasr-band-fair .lasr-gauge-fill { stroke: var(--lasr-fair); }
+.lasr-band-poor .lasr-gauge-fill { stroke: var(--lasr-poor); }
+.lasr-gauge .lasr-number { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.lasr-number { font-size: 40px; font-weight: 700; line-height: 1; color: #1d2327; }
+.lasr-number span { font-size: 15px; color: var(--lasr-muted); font-weight: 400; margin-left: 2px; }
+.lasr-hero-text { flex: 1 1 320px; min-width: 0; }
+.lasr-grade { margin: 0 0 4px; font-size: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.lasr-grade-a, .lasr-grade-b { color: #135e28; }
+.lasr-grade-c, .lasr-grade-d { color: #7a5200; }
+.lasr-grade-f { color: #b32d2e; }
+.lasr-verdict { font-size: 17px; line-height: 1.45; margin: 0 0 10px; color: #1d2327; max-width: 60ch; }
+.lasr-trend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 12px; }
+.lasr-spark { width: 120px; height: 36px; }
+.lasr-spark polyline { fill: none; stroke: var(--lasr-accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.lasr-spark circle { fill: var(--lasr-accent); }
+.lasr-when { color: var(--lasr-muted); }
+.lasr-hero .lasr-run { margin: 0; }
+.lasr-hero .lasr-run .description { display: block; margin: 6px 0 0; }
+.lasr-card-untested { margin: 6px 0 0; font-size: 12px; color: #7a5200; }
+
+/* Category cards */
+.lasr-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 24px; padding: 0; list-style: none; }
+.lasr-card { margin: 0; background: #fff; border: 1px solid var(--lasr-line); border-top: 4px solid var(--lasr-line); border-radius: 6px; padding: 14px 16px; }
+.lasr-card h3 { margin: 0 0 6px; font-size: 14px; }
+.lasr-st-pass { border-top-color: var(--lasr-good); }
+.lasr-st-warn { border-top-color: var(--lasr-fair); }
+.lasr-st-fail { border-top-color: var(--lasr-poor); }
+.lasr-bar { height: 8px; background: #f0f0f1; border-radius: 4px; overflow: hidden; margin: 10px 0 6px; }
+.lasr-bar span { display: block; height: 100%; background: var(--lasr-accent); border-radius: 4px; }
+.lasr-st-pass .lasr-bar span { background: var(--lasr-good); }
+.lasr-st-warn .lasr-bar span { background: var(--lasr-fair); }
+.lasr-st-fail .lasr-bar span { background: var(--lasr-poor); }
+.lasr-card-num { margin: 0 0 4px; font-weight: 600; }
+.lasr-card-about { margin: 0; color: var(--lasr-muted); font-size: 13px; }
+
+/* Badges */
 .lasr-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .lasr-pass { background: #e6f4ea; color: #135e28; }
 .lasr-warn { background: #fff4e0; color: #7a5200; }
 .lasr-fail { background: #fbeaea; color: #b32d2e; }
-.lasr-info, .lasr-skip { background: #f0f0f1; color: #50575e; }
-.lasr-pro { margin-top: 28px; padding: 10px 14px; background: #f6f7f7; border-left: 3px solid #2271b1; max-width: 80ch; }
-.nav-tab-wrapper { margin-bottom: 16px; }
-.lasr-impact-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; }
-.lasr-impact-head .lasr-run { margin: 0; }
-.lasr-empty { max-width: 70ch; padding: 8px 0; }
-.lasr-chart { margin: 0 0 8px; max-width: 680px; }
-.lasr-chart svg { width: 100%; height: auto; background: #fff; border: 1px solid #dcdcde; border-radius: 8px; padding: 8px; box-sizing: border-box; }
-.lasr-grid { stroke: #dcdcde; stroke-width: 1; }
-.lasr-axis { fill: #50575e; font-size: 12px; }
-.lasr-line { fill: none; stroke: #2271b1; stroke-width: 2.5; }
-.lasr-dot { fill: #2271b1; }
+.lasr-info, .lasr-skip { background: #f0f0f1; color: var(--lasr-muted); }
+
+/* Biggest wins */
+.lasr-wins { margin: 0 0 12px 1.4em; max-width: calc(900px - 1.4em); }
+.lasr-win { background: #fff; border: 1px solid var(--lasr-line); border-radius: 6px; padding: 12px 16px; margin: 0 0 10px; }
+.lasr-win-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.lasr-gain { color: #135e28; font-weight: 600; }
+.lasr-affects { color: var(--lasr-muted); font-size: 13px; }
+.lasr-detail { color: var(--lasr-muted); margin: 6px 0 8px; }
+.lasr-win-actions { margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Free vs Pro */
+.lasr-panel { max-width: 900px; box-sizing: border-box; margin: 24px 0; padding: 16px 20px; background: #fff; border: 1px solid var(--lasr-line); border-left: 4px solid var(--lasr-accent); border-radius: 6px; }
+.lasr-panel h2 { margin-top: 0; }
+.lasr-panel-table th[scope=row] { font-weight: 600; width: 34%; }
+.lasr-price { margin: 12px 0; }
+.lasr-panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.lasr-panel-actions form { margin: 0; }
+
+/* History, tables, other blocks */
+.lasr-table { margin: 8px 0 20px; }
+.lasr-table th[scope=row] { font-weight: 400; }
+.lasr-chart { margin: 0 0 8px; max-width: 900px; }
+.lasr-chart svg { width: 100%; height: auto; background: #fff; border: 1px solid var(--lasr-line); border-radius: 8px; padding: 8px; box-sizing: border-box; }
+.lasr-grid { stroke: var(--lasr-line); stroke-width: 1; }
+.lasr-axis { fill: var(--lasr-muted); font-size: 12px; }
+.lasr-line { fill: none; stroke: var(--lasr-accent); stroke-width: 2.5; }
+.lasr-dot { fill: var(--lasr-accent); }
 .lasr-fixed li::before { content: "\2713\00a0"; color: #135e28; font-weight: 700; }
 .lasr-broken { color: #b32d2e; }
-.lasr-then-now { max-width: 680px; }
-.lasr-run .description { margin-left: 8px; }
-.lasr-review { max-width: 680px; margin: 0 0 16px; padding: 12px 16px; background: #fff; border: 1px solid #dcdcde; border-left: 4px solid #2271b1; border-radius: 4px; }
+.lasr-then-now { max-width: 900px; }
+.lasr-products summary, .lasr-share summary { cursor: pointer; font-weight: 600; margin: 8px 0; }
+.lasr-csv { margin: 0 0 8px; }
+.lasr-review { max-width: 900px; box-sizing: border-box; margin: 0 0 16px; padding: 12px 16px; background: #fff; border: 1px solid var(--lasr-line); border-left: 4px solid var(--lasr-accent); border-radius: 4px; }
 .lasr-review p { margin: 0 0 10px; }
-/* The chart scales down on phones; SVG text scales with it, so labels get bigger in SVG units to stay readable. */
+
+@media (max-width: 960px) { .lasr-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Phones: one column; the history chart's SVG text gets bigger in SVG units to stay readable when it scales down. */
 @media (max-width: 600px) {
-	.lasr-number { font-size: 36px; } .lasr-axis { font-size: 22px; } .lasr-dot { r: 6px; }
-	.lasr-score { flex-wrap: wrap; max-width: 100%; box-sizing: border-box; }
+	.lasr-hero { padding: 16px; }
+	.lasr-gauge { width: 112px; height: 112px; }
+	.lasr-number { font-size: 32px; }
+	.lasr-cards { grid-template-columns: 1fr; }
+	.lasr-axis { font-size: 22px; } .lasr-dot { r: 6px; }
 	.lasr-wrap .lasr-table { display: block; overflow-x: auto; }
 	.lasr-share textarea { max-width: 100%; box-sizing: border-box; }
+	.lasr-wins { margin-left: 1.1em; }
+	/* The checks table becomes one card per check: name, result and points, then the details underneath. */
+	.lasr-wrap .lasr-checks { display: block; overflow: visible; }
+	.lasr-checks thead, .lasr-checks .lasr-col-area { display: none; }
+	.lasr-checks tbody, .lasr-checks tr { display: block; }
+	.lasr-checks tr { padding: 10px 12px; border-bottom: 1px solid var(--lasr-line); }
+	.lasr-checks th[scope=row], .lasr-checks td { display: inline-block; padding: 2px 8px 2px 0; border: 0; }
+	.lasr-checks th[scope=row] { display: block; font-weight: 600; }
+	.lasr-checks td:last-child { display: block; color: var(--lasr-muted); }
 }
