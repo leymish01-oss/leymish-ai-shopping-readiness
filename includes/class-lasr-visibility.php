@@ -37,45 +37,115 @@ class LASR_Visibility {
 	}
 
 	/**
-	 * Draft questions from category names (pure). Up to $max, each a real shopper's question.
+	 * Decode HTML entities exactly once (pure): "serums &amp;amp; boosters" stored by some imports becomes
+	 * "serums &amp; boosters" -> "serums & boosters" on screen, never "&amp;amp;".
 	 *
-	 * @param string[] $cats    Category names, most products first.
-	 * @param string   $store   Store name.
-	 * @param int      $max     How many.
+	 * @param string $s Text.
+	 * @return string
+	 */
+	public static function decode( $s ) {
+		$s = (string) $s;
+		for ( $i = 0; $i < 2 && false !== strpos( $s, '&' ); $i++ ) {
+			$d = html_entity_decode( $s, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			if ( $d === $s ) {
+				break;
+			}
+			$s = $d;
+		}
+		return $s;
+	}
+
+	/**
+	 * What shoppers would search for, from product names and their key-ingredient attributes (pure, 2.0.1):
+	 * "Exosome &amp; Niacinamide Serum" -> "exosome and niacinamide serum"; a "Key ingredient: Retinol" attribute on a
+	 * "… Night Cream" adds "retinol night cream". Sets, boxes and bundles are left out (nobody asks an AI for them).
+	 *
+	 * @param array[] $products Each: name, ingredients (string[]).
+	 * @param int     $max      How many topics.
 	 * @return string[]
 	 */
-	public static function draft( array $cats, $store, $max = 10 ) {
-		$cats = array_values(
+	public static function product_topics( array $products, $max = 8 ) {
+		$out = array();
+		foreach ( $products as $p ) {
+			$name = strtolower( self::decode( isset( $p['name'] ) ? $p['name'] : '' ) );
+			$name = preg_replace( '/\([^)]*\)|\b\d+(\.\d+)?\s*(ml|g|oz|fl oz|mg|caps|capsules|ct|pcs)\b/', ' ', $name );
+			$name = str_replace( array( '&', '+', '/' ), array( ' and ', ' and ', ' ' ), $name );
+			$name = trim( preg_replace( '/[^a-z0-9\- ]+/', ' ', $name ) );
+			$name = trim( preg_replace( '/\s+/', ' ', $name ) );
+			if ( '' === $name || preg_match( '/\b(box|set|duo|trio|bundle|kit|collection|gift|sample|routine)\b/', $name ) ) {
+				continue;
+			}
+			$words = explode( ' ', $name );
+			if ( count( $words ) > 6 ) {
+				$name = implode( ' ', array_slice( $words, -6 ) );
+			}
+			$out[] = $name;
+			$type  = end( $words );
+			foreach ( (array) ( isset( $p['ingredients'] ) ? $p['ingredients'] : array() ) as $ing ) {
+				$ing = strtolower( trim( preg_replace( '/[^a-z0-9\- ]+/i', ' ', self::decode( $ing ) ) ) );
+				if ( '' !== $ing && false === strpos( $name, $ing ) && strlen( $ing ) <= 30 ) {
+					$out[] = $ing . ' ' . $type;
+				}
+			}
+		}
+		return array_slice( array_values( array_unique( $out ) ), 0, $max );
+	}
+
+	/**
+	 * Draft questions (pure, 2.0.1). Topics are product types and key ingredients (or category names when there are
+	 * no products), asked two ways in turn: "What is the best X?" and "Where can I buy X online?". The store's top
+	 * Search Console queries go first when an integration supplies them, and one brand question goes last.
+	 *
+	 * @param string[] $topics  Topics, most important first.
+	 * @param string   $store   Store name.
+	 * @param int      $max     How many.
+	 * @param string[] $queries Search Console queries (optional).
+	 * @param string   $domain  The store's domain (optional).
+	 * @return string[]
+	 */
+	public static function draft( array $topics, $store, $max = 10, array $queries = array(), $domain = '' ) {
+		$topics = array_values(
 			array_filter(
 				array_map(
 					function ( $c ) {
-						return strtolower( trim( wp_strip_all_tags( (string) $c ) ) );
+						return strtolower( trim( wp_strip_all_tags( self::decode( $c ) ) ) );
 					},
-					$cats
+					$topics
 				),
 				function ( $c ) {
 					return '' !== $c && 'uncategorized' !== $c && 'uncategorised' !== $c;
 				}
 			)
 		);
-		$out = array();
-		if ( ! $cats ) {
-			$cats = array( 'products like ours' );
+		if ( ! $topics ) {
+			$topics = array( 'products like ours' );
 		}
-		$templates = array(
-			'Where can I buy %s online?',
-			'What are the best %s brands right now?',
-			'Which online shop has good %s?',
-		);
-		foreach ( $templates as $tpl ) {
-			foreach ( $cats as $c ) {
-				$out[] = sprintf( $tpl, $c );
+		$store = trim( self::decode( $store ) );
+		$out   = array();
+		foreach ( array_slice( $queries, 0, 3 ) as $q ) {
+			$q = trim( wp_strip_all_tags( self::decode( $q ) ) );
+			if ( strlen( $q ) >= 8 ) {
+				$out[] = ucfirst( rtrim( $q, '?' ) ) . '?';
 			}
 		}
-		if ( '' !== trim( (string) $store ) ) {
-			$out[] = sprintf( 'Is %s a good place to buy %s?', trim( (string) $store ), $cats[0] );
+		$room = max( 1, $max - ( '' !== $store ? 1 : 0 ) );
+		foreach ( array( 0, 1, 2 ) as $round ) {
+			foreach ( $topics as $i => $c ) {
+				if ( 2 === $round ) {
+					$out[] = sprintf( 'Which online shop has good %s?', $c );
+					continue;
+				}
+				$best  = 0 === ( $i + $round ) % 2;
+				$out[] = $best ? sprintf( 'What is the best %s?', $c ) : sprintf( 'Where can I buy %s online?', $c );
+			}
 		}
-		return array_slice( array_values( array_unique( $out ) ), 0, $max );
+		$out = array_slice( array_values( array_unique( $out ) ), 0, $room );
+		if ( '' !== $store ) {
+			$out[] = '' !== $domain
+				? sprintf( 'Is %1$s (%2$s) a good place to buy %3$s?', $store, $domain, $topics[0] )
+				: sprintf( 'Is %1$s a good place to buy %2$s?', $store, $topics[0] );
+		}
+		return array_slice( $out, 0, $max );
 	}
 
 	/**
@@ -86,19 +156,54 @@ class LASR_Visibility {
 	public static function questions() {
 		$q = get_option( self::QUESTIONS );
 		if ( is_array( $q ) && $q ) {
-			return array_slice( $q, 0, self::PRO );
+			return array_slice( array_map( array( __CLASS__, 'decode' ), $q ), 0, self::PRO );
 		}
-		$cats  = get_terms(
+		$products = array();
+		$ids      = function_exists( 'wc_get_products' ) ? wc_get_products(
 			array(
-				'taxonomy'   => 'product_cat',
-				'hide_empty' => true,
-				'orderby'    => 'count',
-				'order'      => 'DESC',
-				'number'     => 4,
-				'fields'     => 'names',
+				'status'  => 'publish',
+				'limit'   => 12,
+				'orderby' => 'popularity',
+				'return'  => 'ids',
 			)
-		);
-		return self::draft( is_array( $cats ) ? $cats : array(), wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ) );
+		) : array();
+		foreach ( (array) $ids as $id ) {
+			$p = wc_get_product( $id );
+			if ( ! $p ) {
+				continue;
+			}
+			$ing = array();
+			foreach ( $p->get_attributes() as $a ) {
+				if ( is_object( $a ) && preg_match( '/ingredient/i', wc_attribute_label( $a->get_name() ) ) ) {
+					$ing = array_merge( $ing, array_slice( (array) $a->get_options(), 0, 2 ) );
+				}
+			}
+			$products[] = array(
+				'name'        => $p->get_name(),
+				'ingredients' => array_filter( $ing, 'is_string' ),
+			);
+		}
+		$topics = self::product_topics( $products, 8 );
+		if ( count( $topics ) < 3 ) {
+			$cats   = get_terms(
+				array(
+					'taxonomy'   => 'product_cat',
+					'hide_empty' => true,
+					'orderby'    => 'count',
+					'order'      => 'DESC',
+					'number'     => 4,
+					'fields'     => 'names',
+				)
+			);
+			$topics = array_merge( $topics, is_array( $cats ) ? $cats : array() );
+		}
+		/**
+		 * The store's top Search Console queries, for integrations that have them (none are fetched by this plugin).
+		 *
+		 * @param string[] $queries Queries, most clicks first.
+		 */
+		$queries = (array) apply_filters( 'lasr_visibility_queries', array() );
+		return self::draft( $topics, wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ), self::PRO, $queries, (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
 	}
 
 	/**
@@ -355,7 +460,7 @@ class LASR_Visibility {
 		$q = self::questions();
 		echo '<div class="lasr-two"><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="lasr-card-box">';
 		wp_nonce_field( 'lasr_vis_questions' );
-		echo '<input type="hidden" name="action" value="lasr_vis_questions" /><h3><label for="lasr-vis-q">' . esc_html__( 'Your shoppers\' questions', 'leymish-ai-shopping-readiness' ) . '</label></h3><p class="description">' . esc_html__( 'Drafted from your product categories. One per line, up to 10. The free check uses the first 3.', 'leymish-ai-shopping-readiness' ) . '</p>';
+		echo '<input type="hidden" name="action" value="lasr_vis_questions" /><h3><label for="lasr-vis-q">' . esc_html__( 'Your shoppers\' questions', 'leymish-ai-shopping-readiness' ) . '</label></h3><p class="description">' . esc_html__( 'Drafted from your products (types and key ingredients) plus one brand question. Edit them so they sound like your shoppers. One per line, up to 10. The free check uses the first 3.', 'leymish-ai-shopping-readiness' ) . '</p>';
 		echo '<textarea id="lasr-vis-q" name="questions" rows="8" class="large-text">' . esc_textarea( implode( "\n", $q ) ) . '</textarea>';
 		submit_button( __( 'Save questions', 'leymish-ai-shopping-readiness' ), 'secondary', 'submit', false );
 		echo '</form>';

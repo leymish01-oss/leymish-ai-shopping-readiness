@@ -49,7 +49,7 @@ class LASR_Scoring {
 	public static function fix_list( array $checks ) {
 		$fixes = array();
 		foreach ( $checks as $c ) {
-			if ( in_array( $c['status'], array( 'info', 'skip', 'pass' ), true ) ) {
+			if ( in_array( $c['status'], array( 'info', 'skip', 'pass' ), true ) || self::is_watch( $c ) ) {
 				continue;
 			}
 			$lost = (float) $c['points'] - (float) $c['earned'];
@@ -69,6 +69,44 @@ class LASR_Scoring {
 			}
 		);
 		return $fixes;
+	}
+
+	/**
+	 * A check whose remaining points need something no WooCommerce store can switch on yet (2.0.1): today, the
+	 * checkout half of UCP when the profile itself is in place. Never a "win" or "what's wrong"; it is shown as
+	 * "next to watch". Audits saved by 2.0.0 have no flag, so a half-earned UCP check counts too.
+	 *
+	 * @param array $c Check.
+	 * @return bool
+	 */
+	public static function is_watch( array $c ) {
+		if ( ! empty( $c['watch'] ) ) {
+			return true;
+		}
+		return isset( $c['id'] ) && 'ucp' === $c['id'] && 'warn' === $c['status'] && (float) $c['earned'] > 0;
+	}
+
+	/**
+	 * Checks to watch (see is_watch()).
+	 *
+	 * @param array $checks Check results.
+	 * @return array
+	 */
+	public static function watch_list( array $checks ) {
+		return array_values( array_filter( $checks, array( __CLASS__, 'is_watch' ) ) );
+	}
+
+	/**
+	 * The plain name of something to watch.
+	 *
+	 * @param array $c Check.
+	 * @return string
+	 */
+	public static function watch_label( array $c ) {
+		if ( isset( $c['id'] ) && 'ucp' === $c['id'] ) {
+			return function_exists( '__' ) ? __( 'UCP checkout (not available for WooCommerce yet)', 'leymish-ai-shopping-readiness' ) : 'UCP checkout (not available for WooCommerce yet)';
+		}
+		return (string) $c['label'];
 	}
 
 	/**

@@ -17,6 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class LASR_Worklog {
 
 	const WORKLOG = 'lasr_worklog';
+	const EVENTS  = 'lasr_events';
 
 	/**
 	 * Hooks.
@@ -111,6 +112,111 @@ class LASR_Worklog {
 	}
 
 	/**
+	 * Log one thing that changed on this store (2.0.1): a setting switched on or off, an audit score change, Store Team
+	 * approvals. Plain text, kept on this site (the last 50).
+	 *
+	 * @param string $type Short type: setting, audit, approval, fix.
+	 * @param string $text What happened, in plain words.
+	 * @param int    $now  Timestamp (tests pass one).
+	 */
+	public static function event( $type, $text, $now = 0 ) {
+		$events   = self::events();
+		$events[] = array(
+			't'    => $now ? (int) $now : time(),
+			'type' => sanitize_key( $type ),
+			'text' => sanitize_text_field( $text ),
+		);
+		update_option( self::EVENTS, array_slice( $events, -50 ), false );
+	}
+
+	/**
+	 * Logged events, oldest first.
+	 *
+	 * @return array[]
+	 */
+	public static function events() {
+		$e = get_option( self::EVENTS );
+		return is_array( $e ) ? $e : array();
+	}
+
+	/**
+	 * Events since a time, newest first (pure).
+	 *
+	 * @param array[] $events Events.
+	 * @param int     $since  Timestamp.
+	 * @return array[]
+	 */
+	public static function events_since( array $events, $since ) {
+		$out = array_values(
+			array_filter(
+				$events,
+				function ( $e ) use ( $since ) {
+					return is_array( $e ) && isset( $e['t'], $e['text'] ) && (int) $e['t'] >= (int) $since;
+				}
+			)
+		);
+		return array_reverse( $out );
+	}
+
+	/**
+	 * Where the store really started (pure, 2.0.1): the earliest real audit score, which is LeyMish agents' first audit
+	 * when it is older than this plugin's first audit. agents = the agents' gain (null when there is none to show).
+	 *
+	 * @param array[] $earlier  Earlier work rows (date, score, label), oldest first.
+	 * @param array   $baseline This plugin's first audit snapshot (t, s).
+	 * @return array{t:int,s:int,agents:int|null,agents_end:int|null}
+	 */
+	public static function start_point( array $earlier, array $baseline ) {
+		$out = array(
+			't'          => (int) $baseline['t'],
+			's'          => (int) $baseline['s'],
+			'agents'     => null,
+			'agents_end' => null,
+		);
+		if ( ! $earlier ) {
+			return $out;
+		}
+		$first = reset( $earlier );
+		$last  = end( $earlier );
+		$t     = strtotime( $first['date'] . ' 12:00:00 UTC' );
+		if ( false === $t || $t >= (int) $baseline['t'] ) {
+			return $out;
+		}
+		return array(
+			't'          => (int) $t,
+			's'          => (int) $first['score'],
+			'agents'     => count( $earlier ) >= 2 ? (int) $last['score'] - (int) $first['score'] : null,
+			'agents_end' => (int) $last['score'],
+		);
+	}
+
+	/**
+	 * The chart's points (pure, 2.0.1): earlier audits by LeyMish agents first (marked imported), then this plugin's
+	 * weekly snapshots. Two audits on the same day keep their order.
+	 *
+	 * @param array[] $history Snapshots (t, s), oldest first.
+	 * @param array[] $earlier Earlier work rows (date, score).
+	 * @return array[]
+	 */
+	public static function chart_history( array $history, array $earlier ) {
+		$first = $history ? (int) reset( $history )['t'] : PHP_INT_MAX;
+		$out   = array();
+		$i     = 0;
+		foreach ( $earlier as $e ) {
+			$t = strtotime( $e['date'] . ' 12:00:00 UTC' );
+			if ( false === $t || $t >= $first ) {
+				continue;
+			}
+			$out[] = array(
+				't'        => (int) $t + 3600 * $i++,
+				's'        => (int) $e['score'],
+				'imported' => true,
+			);
+		}
+		return array_merge( $out, array_values( $history ) );
+	}
+
+	/**
 	 * Paired bars per product-data row (start vs now), with the same numbers in a screen-reader table.
 	 *
 	 * @param array $baseline Baseline snapshot.
@@ -169,9 +275,15 @@ class LASR_Worklog {
 			return $c;
 		}
 		$conn = LASR_Team::connection();
-		$r    = LASR_Service::post( '/v1/team/history', array(), $conn['site_token'] );
-		$rows = self::clean_events( 200 === $r['status'] && isset( $r['data']['events'] ) ? $r['data']['events'] : array() );
+		$r = LASR_Service::post( '/v1/team/history', array(), $conn['site_token'], 6 );
+		if ( 200 !== $r['status'] ) { // keep the last answer; ask again in 10 minutes (2.0.1)
+			$rows = self::clean_events( get_option( 'lasr_earlier_last', array() ) );
+			set_transient( 'lasr_earlier', $rows, 10 * MINUTE_IN_SECONDS );
+			return $rows;
+		}
+		$rows = self::clean_events( isset( $r['data']['events'] ) ? $r['data']['events'] : array() );
 		set_transient( 'lasr_earlier', $rows, 12 * HOUR_IN_SECONDS );
+		update_option( 'lasr_earlier_last', $rows, false );
 		return $rows;
 	}
 
@@ -235,8 +347,9 @@ class LASR_Worklog {
 			$labels[ $c['id'] ] = $c['label'];
 		}
 		$changes = LASR_Impact::changes( $baseline, $current );
+		$start   = self::start_point( $earlier, $baseline );
 		ob_start();
-		LASR_Admin::chart( $history );
+		LASR_Admin::chart( self::chart_history( $history, $earlier ) );
 		$chart = ob_get_clean();
 		$names = array(
 			'identifier' => __( 'Valid GTIN or MPN', 'leymish-ai-shopping-readiness' ),
@@ -276,8 +389,8 @@ class LASR_Worklog {
 		return '<!doctype html><html lang="' . esc_attr( get_bloginfo( 'language' ) ) . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . esc_html( $title ) . '</title><style>' . $css . '</style></head><body>'
 			. '<h1>' . esc_html( $title ) . '</h1>'
 			/* translators: 1: first audit date, 2: latest audit date. */
-			. '<p class="muted">' . esc_html( sprintf( __( 'From %1$s to %2$s. Made by LeyMish AI Readiness on this site.', 'leymish-ai-shopping-readiness' ), wp_date( $date, (int) $baseline['t'] ), wp_date( $date, (int) $current['t'] ) ) ) . '</p>'
-			. '<p><span class="big">' . esc_html( (int) $baseline['s'] . ' → ' . (int) $current['s'] ) . '</span> <span class="muted">' . esc_html__( 'audit score out of 100', 'leymish-ai-shopping-readiness' ) . '</span></p>'
+			. '<p class="muted">' . esc_html( sprintf( __( 'From %1$s to %2$s. Made by LeyMish AI Readiness on this site.', 'leymish-ai-shopping-readiness' ), wp_date( $date, (int) $start['t'] ), wp_date( $date, (int) $current['t'] ) ) ) . '</p>'
+			. '<p><span class="big">' . esc_html( (int) $start['s'] . ' → ' . (int) $current['s'] ) . '</span> <span class="muted">' . esc_html( LASR_Admin::since_text( $start, $baseline, $current ) ) . '</span></p>'
 			. $chart
 			. self::earlier_html( $earlier )
 			. '<h2>' . esc_html__( 'Checks fixed', 'leymish-ai-shopping-readiness' ) . '</h2>' . ( $fixed ? '<ul>' . $fixed . '</ul>' : '<p>' . esc_html__( 'None yet.', 'leymish-ai-shopping-readiness' ) . '</p>' )

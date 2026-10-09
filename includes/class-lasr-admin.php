@@ -93,7 +93,7 @@ class LASR_Admin {
 			/* translators: %d: approvals waiting. */
 			$label .= ' <span class="awaiting-mod count-' . (int) $n . '"><span class="pending-count" aria-hidden="true">' . esc_html( number_format_i18n( $n ) ) . '</span><span class="screen-reader-text">' . esc_html( sprintf( _n( '%d approval waiting', '%d approvals waiting', $n, 'leymish-ai-shopping-readiness' ), $n ) ) . '</span></span>';
 		}
-		add_menu_page(
+		$hook = add_menu_page(
 			__( 'LeyMish AI Readiness', 'leymish-ai-shopping-readiness' ),
 			$label,
 			'manage_woocommerce',
@@ -102,6 +102,22 @@ class LASR_Admin {
 			self::icon(),
 			'55.6'
 		);
+		if ( $hook ) {
+			add_action( 'load-' . $hook, array( __CLASS__, 'warm' ) );
+		}
+	}
+
+	/**
+	 * Before any HTML is sent (2.0.1): fetch what the page needs from LeyMish (Pro status, earlier work), each with a
+	 * short timeout and its own cache. On a slow host the browser then keeps showing the previous page until ours is
+	 * ready, instead of a half-drawn admin screen with only "Skip to main content".
+	 */
+	public static function warm() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+		LASR_License::is_pro();
+		LASR_Worklog::earlier();
 	}
 
 	/**
@@ -425,22 +441,25 @@ class LASR_Admin {
 		foreach ( $result['checks'] as $c ) {
 			$labels[ $c['id'] ] = $c['label'];
 		}
-		$delta = (int) $current['s'] - (int) $baseline['s'];
-		$wins  = LASR_Dashboard::wins( $result, 3 );
+		$delta   = (int) $current['s'] - (int) $baseline['s'];
+		$earlier = LASR_Worklog::earlier();
+		$since   = self::since_text( LASR_Worklog::start_point( $earlier, $baseline ), $baseline, $current );
+		$wins    = LASR_Dashboard::wins( $result, 3 );
 		$log   = LASR_Worklog::worklog();
 		$week  = LASR_Worklog::since( $log, time() - WEEK_IN_SECONDS );
 		$total = 0;
 		foreach ( (array) $log['counts'] as $n ) {
 			$total += (int) $n;
 		}
+		$watch = LASR_Dashboard::watch_text( $result['checks'] );
 		self::three(
 			LASR_Dashboard::verdict( $result ),
 			$total
-				/* translators: 1: changes made, 2: score change. */
-				? sprintf( _n( '%1$d change made here; score %2$s since you started.', '%1$d changes made here; score %2$s since you started.', $total, 'leymish-ai-shopping-readiness' ), $total, ( $delta >= 0 ? '+' : '' ) . $delta )
-				/* translators: %s: score change. */
-				: sprintf( __( 'Score %s since your first audit.', 'leymish-ai-shopping-readiness' ), ( $delta >= 0 ? '+' : '' ) . $delta ),
-			$wins ? $wins[0]['fix'] : __( 'Nothing to fix. Keep an eye on it with the weekly re-audit.', 'leymish-ai-shopping-readiness' ),
+				/* translators: 1: changes made, 2: e.g. "+22 since 27 Sep (77 → 99)". */
+				? sprintf( _n( '%1$d change made here. Score %2$s.', '%1$d changes made here. Score %2$s.', $total, 'leymish-ai-shopping-readiness' ), $total, $since )
+				/* translators: %s: e.g. "+22 since 27 Sep (77 → 99): LeyMish agents +19, this month +3". */
+				: sprintf( __( 'Score %s.', 'leymish-ai-shopping-readiness' ), $since ),
+			$wins ? $wins[0]['fix'] : ( '' !== $watch ? $watch : __( 'Nothing to fix. Keep an eye on it with the weekly re-audit.', 'leymish-ai-shopping-readiness' ) ),
 			$wins ? array( LASR_Dashboard::fix_url( $wins[0]['id'] ), __( 'Fix it', 'leymish-ai-shopping-readiness' ) ) : null
 		);
 
@@ -455,7 +474,9 @@ class LASR_Admin {
 			echo '<input type="hidden" name="action" value="lasr_dismiss_alerts" /><button type="submit" class="button-link">' . esc_html__( 'Dismiss', 'leymish-ai-shopping-readiness' ) . '</button></form></section>';
 		}
 
-		if ( count( $history ) > 1 || $baseline['t'] !== $current['t'] ) {
+		if ( count( $earlier ) >= 1 && LASR_Worklog::start_point( $earlier, $baseline )['t'] < (int) $baseline['t'] ) {
+			$text = $since;
+		} elseif ( count( $history ) > 1 || $baseline['t'] !== $current['t'] ) {
 			$text = 0 === $delta
 				/* translators: 1: starting score, 2: date of the first audit. */
 				? sprintf( __( 'Same score as when you started (%1$d on %2$s)', 'leymish-ai-shopping-readiness' ), (int) $baseline['s'], wp_date( $date, (int) $baseline['t'] ) )
@@ -467,7 +488,7 @@ class LASR_Admin {
 		LASR_Dashboard::hero( $result, $history, $baseline, $text, function () {
 			self::run_form( true );
 		} );
-		LASR_Dashboard::cards( $result['checks'] );
+		LASR_Dashboard::cards( $result['checks'], isset( $result['products'] ) ? (array) $result['products'] : array() );
 		if ( self::review_due( $delta ) ) {
 			self::review_box();
 		}
@@ -485,7 +506,7 @@ class LASR_Admin {
 		self::earlier_work( $history );
 
 		echo '<h2>' . esc_html__( 'Score over time', 'leymish-ai-shopping-readiness' ) . '</h2>';
-		self::chart( $history );
+		self::chart( LASR_Worklog::chart_history( $history, $earlier ) );
 
 		$changes = LASR_Impact::changes( $baseline, $current );
 		echo '<h2>' . esc_html__( 'Fixed since you started', 'leymish-ai-shopping-readiness' ) . '</h2>';
@@ -534,6 +555,36 @@ class LASR_Admin {
 	}
 
 	/**
+	 * The score line (2.0.1), from the earliest real score: "+22 since 27 Sep (77 → 99): LeyMish agents +19, this
+	 * month +3". Without earlier work by LeyMish agents: "+3 since 6 Oct (96 → 99)".
+	 *
+	 * @param array $start    From LASR_Worklog::start_point().
+	 * @param array $baseline This plugin's first audit.
+	 * @param array $current  Latest snapshot.
+	 * @return string
+	 */
+	public static function since_text( array $start, array $baseline, array $current ) {
+		$sign  = function ( $n ) {
+			return ( $n >= 0 ? '+' : '' ) . (int) $n;
+		};
+		$now   = (int) $current['s'];
+		$total = $now - (int) $start['s'];
+		/* translators: 1: signed change, 2: date, 3: start score, 4: score now. */
+		$line = sprintf( __( '%1$s since %2$s (%3$d → %4$d)', 'leymish-ai-shopping-readiness' ), $sign( $total ), wp_date( 'j M', (int) $start['t'] ), (int) $start['s'], $now );
+		if ( null === $start['agents'] ) {
+			return $line;
+		}
+		$here    = $now - (int) $baseline['s'];
+		$same_mo = wp_date( 'Y-m', (int) $baseline['t'] ) === wp_date( 'Y-m' );
+		$period  = $same_mo
+			? __( 'this month', 'leymish-ai-shopping-readiness' )
+			/* translators: %s: date of this plugin's first audit. */
+			: sprintf( __( 'since %s', 'leymish-ai-shopping-readiness' ), wp_date( 'j M', (int) $baseline['t'] ) );
+		/* translators: 1: e.g. "+22 since 27 Sep (77 → 99)", 2: LeyMish agents' gain, 3: "this month" or "since 6 Oct", 4: gain in that period. */
+		return sprintf( __( '%1$s: LeyMish agents %2$s, %3$s %4$s', 'leymish-ai-shopping-readiness' ), $line, $sign( $start['agents'] ), $period, $sign( $here ) );
+	}
+
+	/**
 	 * "What changed this week": this site's own changes, the score over the week, the team and AI visibility.
 	 *
 	 * @param array<string,int> $week    Work counted in the last 7 days.
@@ -541,13 +592,17 @@ class LASR_Admin {
 	 */
 	private static function this_week( array $week, array $history ) {
 		$items = array();
+		$fmt   = 'j M';
+		foreach ( array_slice( LASR_Worklog::events_since( LASR_Worklog::events(), time() - WEEK_IN_SECONDS ), 0, 8 ) as $e ) {
+			$items[] = wp_date( $fmt, (int) $e['t'] ) . ': ' . $e['text'];
+		}
 		$kinds = LASR_Worklog::kinds();
 		foreach ( $week as $k => $n ) {
 			if ( isset( $kinds[ $k ] ) ) {
 				$items[] = $kinds[ $k ] . ': ' . (int) $n;
 			}
 		}
-		if ( count( $history ) >= 2 ) {
+		if ( count( $history ) >= 2 && ! LASR_Worklog::events_since( LASR_Worklog::events(), time() - WEEK_IN_SECONDS ) ) {
 			$last = end( $history );
 			$prev = prev( $history );
 			$d    = (int) $last['s'] - (int) $prev['s'];
@@ -684,8 +739,10 @@ class LASR_Admin {
 				return $p[0] . ',' . $p[1];
 			}, $pts ) ) ) . '" />';
 		}
-		foreach ( $pts as $p ) {
-			echo '<circle class="lasr-dot" cx="' . esc_attr( (string) $p[0] ) . '" cy="' . esc_attr( (string) $p[1] ) . '" r="4" />';
+		$hist = array_values( $history );
+		foreach ( $pts as $i => $p ) {
+			$imported = ! empty( $hist[ $i ]['imported'] );
+			echo '<circle class="lasr-dot' . ( $imported ? ' lasr-dot-imported' : '' ) . '" cx="' . esc_attr( (string) $p[0] ) . '" cy="' . esc_attr( (string) $p[1] ) . '" r="4" />';
 		}
 		$first = reset( $history );
 		$last  = end( $history );
@@ -693,7 +750,16 @@ class LASR_Admin {
 		if ( count( $history ) > 1 ) {
 			echo '<text class="lasr-axis" x="' . esc_attr( (string) $w ) . '" y="' . esc_attr( (string) ( $h + 24 ) ) . '" text-anchor="end">' . esc_html( wp_date( $fmt, (int) $last['t'] ) ) . '</text>';
 		}
-		echo '</svg><figcaption class="description">' . esc_html__( 'One point per week (the last audit of each week). The starting score above is from your very first audit.', 'leymish-ai-shopping-readiness' ) . '</figcaption></figure>';
+		$imported = array_filter(
+			$history,
+			function ( $s ) {
+				return ! empty( $s['imported'] );
+			}
+		);
+		$caption  = $imported
+			? __( 'Hollow points are audits by LeyMish agents before this plugin was installed (same audit, imported from Store Team). Then one point per week: the last audit of each week.', 'leymish-ai-shopping-readiness' )
+			: __( 'One point per week (the last audit of each week). The starting score above is from your very first audit.', 'leymish-ai-shopping-readiness' );
+		echo '</svg><figcaption class="description">' . esc_html( $caption ) . '</figcaption></figure>';
 		echo '<table class="screen-reader-text"><caption>' . esc_html__( 'Audit score by week', 'leymish-ai-shopping-readiness' ) . '</caption><tbody>';
 		foreach ( $history as $s ) {
 			echo '<tr><th scope="row">' . esc_html( wp_date( $fmt, (int) $s['t'] ) ) . '</th><td>' . esc_html( (string) (int) $s['s'] ) . '</td></tr>';
@@ -800,15 +866,47 @@ class LASR_Admin {
 			wp_die( esc_html__( 'You do not have permission to do that.', 'leymish-ai-shopping-readiness' ) );
 		}
 		check_admin_referer( 'lasr_feeds_settings' );
-		$feeds = empty( $_POST['feeds'] ) ? 'no' : 'yes';
+		$before = self::switches();
+		$feeds  = empty( $_POST['feeds'] ) ? 'no' : 'yes';
 		update_option( LASR_Feeds::ENABLED, $feeds, false );
 		update_option( LASR_Llms::OPTION, empty( $_POST['llms'] ) ? 'no' : 'yes', false );
 		LASR_Ucp::save( wp_unslash( $_POST ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- every field is sanitised in LASR_Ucp::save().
+		$names = array(
+			'feeds'       => __( 'OpenAI and Google product feeds', 'leymish-ai-shopping-readiness' ),
+			'llms'        => __( 'llms.txt', 'leymish-ai-shopping-readiness' ),
+			'ucp'         => __( 'UCP business profile', 'leymish-ai-shopping-readiness' ),
+			'identifiers' => __( 'brand, GTIN and MPN in product schema', 'leymish-ai-shopping-readiness' ),
+			'returns'     => __( 'return policy in product schema', 'leymish-ai-shopping-readiness' ),
+			'shipping'    => __( 'shipping details in product schema', 'leymish-ai-shopping-readiness' ),
+		);
+		foreach ( self::switches() as $k => $on ) {
+			if ( isset( $before[ $k ] ) && $before[ $k ] !== $on ) {
+				/* translators: %s: the setting. */
+				LASR_Worklog::event( 'setting', sprintf( $on ? __( 'Switched on: %s', 'leymish-ai-shopping-readiness' ) : __( 'Switched off: %s', 'leymish-ai-shopping-readiness' ), $names[ $k ] ) );
+			}
+		}
 		if ( 'yes' === $feeds ) {
 			LASR_Feeds::rebuild();
 		}
 		wp_safe_redirect( admin_url( 'admin.php?page=' . self::SLUG . '&tab=feeds&lasr_msg=saved' ) );
 		exit;
+	}
+
+	/**
+	 * The Feeds tab's switches, on or off (for "what changed this week").
+	 *
+	 * @return array<string,bool>
+	 */
+	private static function switches() {
+		$ucp = LASR_Ucp::settings();
+		return array(
+			'feeds'       => LASR_Feeds::enabled(),
+			'llms'        => LASR_Llms::enabled(),
+			'ucp'         => 'yes' === $ucp['ucp'],
+			'identifiers' => 'yes' === $ucp['identifiers'],
+			'returns'     => 'yes' === $ucp['returns'],
+			'shipping'    => 'yes' === $ucp['shipping'],
+		);
 	}
 
 	/**

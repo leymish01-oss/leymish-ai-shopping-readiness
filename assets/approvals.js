@@ -198,17 +198,31 @@
     }
 
     root.appendChild(el("h2", { text: t.history }));
-    var rows = history.length ? history.map(function (h) {
+    // 2.0.1: old suggestions that expired before the attribute rules are one plain row, not a wall of raw text
+    var expired = history.filter(function (h) { return h.status === "expired"; });
+    var real = history.filter(function (h) { return h.status !== "expired"; });
+    var outcome = t.outcome || {};
+    var rows = real.map(function (h) {
+      var by = h.by ? h.by + (h.decided_at ? " · " + when(h.decided_at) : "") : (t.unknownBy || "");
       return el("tr", {}, [
         el("td", { text: when(h.at) }), el("td", { text: h.product || "" }), el("td", { text: h.field || "" }),
-        el("td", { text: String(h.now === "" ? "(empty)" : h.now) }), el("td", { text: String(h.proposed) }),
-        el("td", { text: h.error ? h.status + ": " + h.error : h.status }),
+        el("td", { text: String(h.now === "" ? t.empty_was : h.now) }), el("td", { text: String(h.proposed) }),
+        el("td", { text: (outcome[h.status] || h.status) + (h.error ? ": " + h.error : "") }),
+        el("td", { text: by }),
       ]);
-    }) : [el("tr", {}, [el("td", { colspan: "6", text: "Nothing yet." })])];
-    root.appendChild(el("table", { cls: "widefat striped lst-table" }, [
-      el("thead", {}, [el("tr", {}, ["When", t.now, "Field", "Was", "Became", "Outcome"].map(function (h) { return el("th", { scope: "col", text: h }); }))]),
+    });
+    if (expired.length) {
+      rows.push(el("tr", { cls: "lst-expired" }, [el("td", { colspan: "7" }, [
+        el("strong", { text: (t.expired || "Expired before the new rules (%d)").replace("%d", expired.length) }),
+        document.createTextNode(" " + (t.expiredWhy || "")),
+      ])]));
+    }
+    if (!rows.length) rows = [el("tr", {}, [el("td", { colspan: "7", text: t.nothing || "Nothing yet." })])];
+    var cols = t.cols || ["When", "Product", "Field", "Was", "Became", "Outcome", "Approved by"];
+    root.appendChild(el("div", { cls: "lst-table-wrap" }, [el("table", { cls: "widefat striped lst-table" }, [
+      el("thead", {}, [el("tr", {}, cols.map(function (h) { return el("th", { scope: "col", text: h }); }))]),
       el("tbody", {}, rows),
-    ]));
+    ])]));
   }
 
   function load() {

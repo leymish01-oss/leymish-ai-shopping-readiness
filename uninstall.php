@@ -37,6 +37,10 @@ foreach ( array(
 	'lasr_vis_free_used',
 	'lasr_team_connection',
 	'lasr_claim',
+	'lasr_events',
+	'lasr_migrated_seen',
+	'lasr_pro_status_last',
+	'lasr_earlier_last',
 ) as $lasr_option ) {
 	delete_option( $lasr_option );
 }

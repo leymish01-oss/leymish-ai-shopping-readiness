@@ -103,12 +103,21 @@ class LASR_License {
 			return $c;
 		}
 		$conn = LASR_Team::connection();
-		$r    = LASR_Service::post( '/v1/pro/status', array( 'site' => LASR_Service::site() ), $conn['site_token'] );
-		$out  = 200 === $r['status'] && ! empty( $r['data']['pro'] ) ? array(
+		$r = LASR_Service::post( '/v1/pro/status', array( 'site' => LASR_Service::site() ), $conn['site_token'], 6 );
+		if ( 200 !== $r['status'] ) {
+			// 2.0.1: LeyMish didn't answer. Keep the last known answer and ask again in 10 minutes, so a slow moment
+			// neither switches Pro off for 12 hours nor holds up every page.
+			$last = get_option( self::STATUS_KEY . '_last' );
+			$out  = is_array( $last ) ? $last : $none;
+			set_transient( self::STATUS_KEY, $out, 10 * MINUTE_IN_SECONDS );
+			return $out;
+		}
+		$out = ! empty( $r['data']['pro'] ) ? array(
 			'source'  => sanitize_key( (string) $r['data']['source'] ),
 			'ends_at' => isset( $r['data']['ends_at'] ) ? (int) $r['data']['ends_at'] : null,
 		) : $none;
 		set_transient( self::STATUS_KEY, $out, 12 * HOUR_IN_SECONDS );
+		update_option( self::STATUS_KEY . '_last', $out, false );
 		return $out;
 	}
 

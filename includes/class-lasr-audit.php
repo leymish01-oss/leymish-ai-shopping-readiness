@@ -34,6 +34,7 @@ class LASR_Audit {
 		'llms_txt'  => 4,
 		'guest'     => 3,
 		'ucp'       => 2,
+		'returns'   => 2,
 	);
 
 	/**
@@ -56,12 +57,14 @@ class LASR_Audit {
 			self::check_store_api(),
 			self::check_llms_txt(),
 			self::check_guest_checkout(),
+			self::check_returns_page(),
 			self::check_ucp(),
 			self::check_acp(),
 			self::check_mcp(),
 		);
 
 		$score  = LASR_Scoring::score( $checks );
+		$prev   = self::last();
 		$result = array(
 			'score'    => $score,
 			'band'     => LASR_Scoring::band( $score ),
@@ -71,6 +74,10 @@ class LASR_Audit {
 			'summary'  => $catalog['summary'],
 		);
 		update_option( self::OPTION, $result, false );
+		if ( $prev && isset( $prev['score'] ) && (int) $prev['score'] !== $score && class_exists( 'LASR_Worklog' ) ) {
+			/* translators: 1: previous score, 2: new score. */
+			LASR_Worklog::event( 'audit', sprintf( __( 'Audit score %1$d → %2$d', 'leymish-ai-shopping-readiness' ), (int) $prev['score'], $score ) );
+		}
 		/**
 		 * Fires after an audit finishes (the Pro add-on records score history here).
 		 *
@@ -440,6 +447,86 @@ class LASR_Audit {
 	 */
 	private static function browser_ua() {
 		return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
+	}
+
+	/**
+	 * WooCommerce's sample "Refund and Returns Policy" text (pure): two or more of its sentences. WooCommerce creates
+	 * that page as a draft; some stores publish it by accident, and then Google and AI agents can read a 30-day
+	 * policy that isn't the store's.
+	 *
+	 * @param string $content Page content.
+	 * @return bool
+	 */
+	public static function is_sample_returns( $content ) {
+		$text = strtolower( preg_replace( '/\s+/', ' ', wp_strip_all_tags( (string) $content ) ) );
+		$hits = 0;
+		foreach ( array( 'our refund and returns policy lasts 30 days', 'if 30 days have passed since your purchase', 'to complete your return, we require a receipt or proof of purchase', 'please do not send your purchase back to the manufacturer', 'there are certain situations where only partial refunds are granted' ) as $s ) {
+			$hits += false !== strpos( $text, $s ) ? 1 : 0;
+		}
+		return $hits >= 2;
+	}
+
+	/**
+	 * The published page that still carries WooCommerce's sample returns text, or 0.
+	 *
+	 * @return int
+	 */
+	public static function sample_returns_page() {
+		$ids  = array( (int) get_option( 'woocommerce_refund_returns_page_id' ) );
+		$page = get_page_by_path( 'refund_returns' );
+		if ( $page ) {
+			$ids[] = (int) $page->ID;
+		}
+		foreach ( array_unique( array_filter( $ids ) ) as $id ) {
+			$post = get_post( $id );
+			if ( $post && 'page' === $post->post_type && 'publish' === $post->post_status && self::is_sample_returns( $post->post_content ) ) {
+				return (int) $id;
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * Another published page that looks like the store's real returns policy (title mentions refund or return).
+	 *
+	 * @param int $except The sample page.
+	 * @return WP_Post|null
+	 */
+	public static function real_returns_page( $except ) {
+		foreach ( get_pages( array( 'post_status' => 'publish', 'number' => 200 ) ) as $p ) {
+			if ( (int) $p->ID !== (int) $except && preg_match( '/refund|return/i', $p->post_title . ' ' . $p->post_name ) && ! self::is_sample_returns( $p->post_content ) ) {
+				return $p;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Free check (2.0.1): WooCommerce's sample returns page is not published. Local only; nothing leaves the site.
+	 *
+	 * @return array
+	 */
+	private static function check_returns_page() {
+		$label  = __( 'No WooCommerce sample returns page published', 'leymish-ai-shopping-readiness' );
+		$sample = self::sample_returns_page();
+		if ( ! $sample ) {
+			return self::check( 'returns', $label, 'pass', 1, __( 'WooCommerce\'s sample "Refund and Returns Policy" page is not published.', 'leymish-ai-shopping-readiness' ), '', 1 );
+		}
+		$real = self::real_returns_page( $sample );
+		$url  = (string) get_permalink( $sample );
+		return self::check(
+			'returns',
+			$label,
+			'fail',
+			0,
+			/* translators: %s: address of the sample page. */
+			sprintf( __( 'WooCommerce\'s sample "Refund and Returns Policy" is published at %s. It promises 30-day returns, which may not be your policy, and Google and AI shopping agents can read it.', 'leymish-ai-shopping-readiness' ), $url ),
+			$real
+				/* translators: 1: the real page's title, 2: its address. */
+				? sprintf( __( 'Set the sample page to draft (Pages → edit it → Switch to draft). Then point WooCommerce\'s refund page setting and your footer or menu links at your real policy, "%1$s" (%2$s).', 'leymish-ai-shopping-readiness' ), wp_specialchars_decode( $real->post_title, ENT_QUOTES ), get_permalink( $real ) )
+				: __( 'Replace the sample text with your real returns policy, or set the page to draft (Pages → edit it → Switch to draft).', 'leymish-ai-shopping-readiness' ),
+			1
+		);
 	}
 
 	/**
@@ -895,7 +982,7 @@ class LASR_Audit {
 				sprintf( __( 'Valid UCP profile (version %1$s) that declares no checkout services yet, so agents can find you but not check out through UCP. Checked against the UCP specification of %2$s.', 'leymish-ai-shopping-readiness' ), $version, $v['ucp'] ),
 				__( 'Your profile is in place. The other half needs a checkout integration that implements UCP and adds its service to the profile. WooCommerce core does not have one yet, so this is worth watching, not urgent.', 'leymish-ai-shopping-readiness' ),
 				3
-			);
+			) + array( 'watch' => true );
 		}
 		return self::check(
 			'ucp',

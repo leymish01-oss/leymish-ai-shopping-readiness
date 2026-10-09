@@ -271,3 +271,9 @@ input.lasr-gtin[aria-invalid="true"] { border-color: #d63638; box-shadow: 0 0 0 
 	.lasr-checks th[scope=row] { display: block; font-weight: 600; }
 	.lasr-checks td:last-child { display: block; color: var(--lasr-muted); }
 }
+/* 2.0.1 */
+.lasr-card-gaps { margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.lasr-card-gaps li { margin: 4px 0; }
+.lasr-dot-imported { fill: #fff; stroke: var(--lasr-accent); stroke-width: 2; }
+.lst-table-wrap { overflow-x: auto; }
+.lst-expired td { color: var(--lasr-muted); }

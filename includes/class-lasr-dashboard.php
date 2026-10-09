@@ -48,7 +48,7 @@ class LASR_Dashboard {
 			'access'   => array( __( 'Access', 'leymish-ai-shopping-readiness' ), __( 'Robots, crawlers and what they receive', 'leymish-ai-shopping-readiness' ), array( 'public', 'robots', 'bot_block', 'no_js', 'llms_txt' ) ),
 			'product'  => array( __( 'Product data', 'leymish-ai-shopping-readiness' ), __( 'GTIN, brand, attributes, images and structured data', 'leymish-ai-shopping-readiness' ), array( 'catalog', 'jsonld' ) ),
 			'api'      => array( __( 'Store API', 'leymish-ai-shopping-readiness' ), __( 'The product feed apps and agents read', 'leymish-ai-shopping-readiness' ), array( 'store_api' ) ),
-			'checkout' => array( __( 'AI checkout readiness', 'leymish-ai-shopping-readiness' ), __( 'Guest checkout, UCP and ACP', 'leymish-ai-shopping-readiness' ), array( 'guest', 'ucp', 'acp', 'mcp' ) ),
+			'checkout' => array( __( 'AI checkout readiness', 'leymish-ai-shopping-readiness' ), __( 'Guest checkout, returns policy, UCP and ACP', 'leymish-ai-shopping-readiness' ), array( 'guest', 'returns', 'ucp', 'acp', 'mcp' ) ),
 		);
 	}
 
@@ -86,12 +86,13 @@ class LASR_Dashboard {
 				$points += (int) $c['points'];
 				$earned += max( 0.0, min( (float) $c['earned'], (float) $c['points'] ) );
 				if ( 'pass' !== $c['status'] ) {
-					$needs[] = $c['label'];
+					$needs[] = LASR_Scoring::is_watch( $c ) ? LASR_Scoring::watch_label( $c ) : $c['label'];
 				}
 			}
 			if ( $points > 0 ) {
-				$pct    = (int) round( 100 * $earned / $points );
-				$status = LASR_Scoring::status_for( $earned / $points );
+				$pct = (int) round( 100 * $earned / $points );
+				// 2.0.1: the word follows the number people see, so 100% is never "Needs work".
+				$status = $pct >= 100 ? 'pass' : LASR_Scoring::status_for( $earned / $points );
 			} else {
 				$pct    = null;
 				$status = $skipped ? 'skip' : 'info';
@@ -208,7 +209,57 @@ class LASR_Dashboard {
 			/* translators: %s: name of the check worth the most points. */
 			return sprintf( __( 'AI shopping agents can read your store. Your biggest remaining win is "%s".', 'leymish-ai-shopping-readiness' ), $fixes[0]['label'] );
 		}
+		$watch = self::watch_text( $checks );
+		if ( '' !== $watch ) {
+			return $watch;
+		}
 		return __( 'AI shopping agents can read your store, and nothing we check for is missing.', 'leymish-ai-shopping-readiness' );
+	}
+
+	/**
+	 * "Nothing urgent. Next to watch: …" when the only points left need something nobody can switch on yet (2.0.1).
+	 *
+	 * @param array $checks Check results.
+	 * @return string Empty when there is nothing to watch.
+	 */
+	public static function watch_text( array $checks ) {
+		$watch = LASR_Scoring::watch_list( $checks );
+		if ( ! $watch ) {
+			return '';
+		}
+		/* translators: %s: what to watch, e.g. UCP checkout (not available for WooCommerce yet). */
+		return sprintf( __( 'Nothing urgent. Next to watch: %s.', 'leymish-ai-shopping-readiness' ), implode( ', ', array_map( array( 'LASR_Scoring', 'watch_label' ), $watch ) ) );
+	}
+
+	/**
+	 * Products that still have a gap, worst first, with what's missing in words (2.0.1).
+	 *
+	 * @param array $products Audit product rows.
+	 * @param int   $max      How many.
+	 * @return array[] id, name, missing (labels).
+	 */
+	public static function gap_products( $products, $max = 3 ) {
+		$labels = LASR_Audit::field_labels();
+		$out    = array();
+		foreach ( (array) $products as $p ) {
+			if ( empty( $p['missing'] ) ) {
+				continue;
+			}
+			$out[] = array(
+				'id'      => isset( $p['id'] ) ? (int) $p['id'] : 0,
+				'name'    => isset( $p['name'] ) ? wp_specialchars_decode( (string) $p['name'], ENT_QUOTES ) : '',
+				'missing' => array_map(
+					function ( $f ) use ( $labels ) {
+						return isset( $labels[ $f ] ) ? $labels[ $f ] : $f;
+					},
+					(array) $p['missing']
+				),
+			);
+			if ( count( $out ) >= $max ) {
+				break;
+			}
+		}
+		return $out;
 	}
 
 	/**
@@ -249,6 +300,13 @@ class LASR_Dashboard {
 		);
 		if ( isset( $tabs[ $id ] ) && class_exists( 'LASR_Admin' ) ) {
 			return admin_url( 'admin.php?page=' . LASR_Admin::SLUG . '&tab=' . $tabs[ $id ] );
+		}
+		if ( 'returns' === $id && class_exists( 'LASR_Audit' ) && function_exists( 'get_edit_post_link' ) ) {
+			$page = LASR_Audit::sample_returns_page();
+			$edit = $page ? get_edit_post_link( $page, 'raw' ) : '';
+			if ( $edit ) {
+				return $edit;
+			}
 		}
 		return self::guide_url( $id );
 	}
@@ -374,7 +432,7 @@ class LASR_Dashboard {
 	 *
 	 * @param array $checks Check results.
 	 */
-	public static function cards( array $checks ) {
+	public static function cards( array $checks, array $products = array() ) {
 		$words = array(
 			'pass' => __( 'Good', 'leymish-ai-shopping-readiness' ),
 			'warn' => __( 'Needs work', 'leymish-ai-shopping-readiness' ),
@@ -393,7 +451,21 @@ class LASR_Dashboard {
 			} else {
 				echo '<p class="lasr-card-num">' . esc_html( 'skip' === $c['status'] ? __( 'Could not be tested on this run.', 'leymish-ai-shopping-readiness' ) : __( 'Shown for information; not scored yet.', 'leymish-ai-shopping-readiness' ) ) . '</p>';
 			}
-			echo '<p class="lasr-card-about">' . esc_html( $c['needs'] ? implode( ', ', $c['needs'] ) : $c['about'] ) . '</p>';
+			$gaps = 'product' === $c['key'] && null !== $c['percent'] ? self::gap_products( $products, 4 ) : array();
+			if ( $gaps && count( $gaps ) <= 3 ) {
+				echo '<ul class="lasr-card-gaps">';
+				foreach ( $gaps as $g ) {
+					/* translators: 1: product name, 2: what is missing. */
+					echo '<li>' . esc_html( sprintf( __( '%1$s: %2$s', 'leymish-ai-shopping-readiness' ), $g['name'], implode( ', ', $g['missing'] ) ) );
+					if ( $g['id'] && class_exists( 'LASR_Admin' ) ) {
+						echo ' <a class="button button-small" href="' . esc_url( admin_url( 'admin.php?page=' . LASR_Admin::SLUG . '&tab=products&card=' . $g['id'] ) ) . '">' . esc_html__( 'Fix it', 'leymish-ai-shopping-readiness' ) . '<span class="screen-reader-text"> ' . esc_html( $g['name'] ) . '</span></a>';
+					}
+					echo '</li>';
+				}
+				echo '</ul>';
+			} else {
+				echo '<p class="lasr-card-about">' . esc_html( $c['needs'] ? implode( ', ', $c['needs'] ) : $c['about'] ) . '</p>';
+			}
 			if ( $c['skipped'] && null !== $c['percent'] ) {
 				/* translators: 1: checks not tested, 2: checks in this area. */
 				echo '<p class="lasr-card-untested">' . esc_html( sprintf( _n( '%1$d of %2$d check could not be tested this run, so this is a partial score.', '%1$d of %2$d checks could not be tested this run, so this is a partial score.', $c['present'], 'leymish-ai-shopping-readiness' ), $c['skipped'], $c['present'] ) ) . '</p>';

@@ -3,7 +3,7 @@
  * Plugin Name:          LeyMish AI Readiness
  * Plugin URI:           https://www.leymish.com/woocommerce/
  * Description:          Can ChatGPT, Google and Perplexity find, read and trust your WooCommerce products? A 0–100 audit, a products editor with one-click fixes, OpenAI and Google feeds, llms.txt, a UCP profile and richer product schema, all running on your site, free. Optional LeyMish Pro services: AI visibility checks, AI fixes you approve, outside monitoring and the Store Team agents.
- * Version:              2.0.0
+ * Version:              2.0.1
  * Requires at least:    6.4
  * Requires PHP:         7.4
  * Requires Plugins:     woocommerce
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'LASR_VERSION', '2.0.0' );
+define( 'LASR_VERSION', '2.0.1' );
 define( 'LASR_FILE', __FILE__ );
 define( 'LASR_DIR', plugin_dir_path( __FILE__ ) );
 

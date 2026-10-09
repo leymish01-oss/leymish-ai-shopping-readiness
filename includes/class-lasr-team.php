@@ -53,9 +53,9 @@ class LASR_Team {
 	 * @param array  $body Body.
 	 * @return array{status:int,data:array}
 	 */
-	public static function call( $path, array $body = array() ) {
+	public static function call( $path, array $body = array(), $timeout = 15 ) {
 		$c = self::connection();
-		return LASR_Service::post( '/v1/team/' . $path, $body, $c ? $c['site_token'] : '', 15 );
+		return LASR_Service::post( '/v1/team/' . $path, $body, $c ? $c['site_token'] : '', $timeout );
 	}
 
 	/**
@@ -86,7 +86,7 @@ class LASR_Team {
 				return (int) $cached;
 			}
 		}
-		$r = self::call( 'approvals/count' );
+		$r = self::call( 'approvals/count', array(), 5 ); // runs on every admin page: never hold one up for long
 		$n = 200 === $r['status'] && isset( $r['data']['waiting'] ) ? (int) $r['data']['waiting'] : 0;
 		set_transient( self::COUNT_KEY, $n, self::COUNT_TTL );
 		return $n;
@@ -238,11 +238,22 @@ class LASR_Team {
 				$body['edit'] = $edit;
 			}
 		}
-		$r = self::call( 'approvals/decide', $body );
+		$user       = wp_get_current_user();
+		$body['by'] = $user && $user->exists() ? mb_substr( (string) $user->display_name, 0, 60 ) : 'owner';
+		$r          = self::call( 'approvals/decide', $body );
 		delete_transient( self::COUNT_KEY );
 		if ( 200 !== $r['status'] ) {
 			wp_send_json_error( array( 'message' => isset( $r['data']['error'] ) ? (string) $r['data']['error'] : __( 'That did not save.', 'leymish-ai-shopping-readiness' ) ), 400 );
 		}
+		$n = isset( $body['ids'] ) ? count( $body['ids'] ) : 1;
+		LASR_Worklog::event(
+			'approval',
+			'approve' === $decision
+				/* translators: 1: number of changes, 2: who approved. */
+				? sprintf( _n( '%1$d Store Team change approved by %2$s', '%1$d Store Team changes approved by %2$s', $n, 'leymish-ai-shopping-readiness' ), $n, $body['by'] )
+				/* translators: 1: number of changes, 2: who rejected. */
+				: sprintf( _n( '%1$d Store Team change rejected by %2$s', '%1$d Store Team changes rejected by %2$s', $n, 'leymish-ai-shopping-readiness' ), $n, $body['by'] )
+		);
 		wp_send_json_success( $r['data'] );
 	}
 
@@ -311,6 +322,21 @@ class LASR_Team {
 				'history'    => __( 'Decisions you have already made', 'leymish-ai-shopping-readiness' ),
 				'waiting'    => __( 'Waiting for you', 'leymish-ai-shopping-readiness' ),
 				'chooseSome' => __( 'Tick at least one change first.', 'leymish-ai-shopping-readiness' ),
+				'cols'       => array( __( 'When', 'leymish-ai-shopping-readiness' ), __( 'Product', 'leymish-ai-shopping-readiness' ), __( 'Field', 'leymish-ai-shopping-readiness' ), __( 'Was', 'leymish-ai-shopping-readiness' ), __( 'Became', 'leymish-ai-shopping-readiness' ), __( 'Outcome', 'leymish-ai-shopping-readiness' ), __( 'Approved by', 'leymish-ai-shopping-readiness' ) ),
+				'outcome'    => array(
+					'done'     => __( 'Applied', 'leymish-ai-shopping-readiness' ),
+					'queued'   => __( 'Approved, waiting to apply', 'leymish-ai-shopping-readiness' ),
+					'rejected' => __( 'Rejected', 'leymish-ai-shopping-readiness' ),
+					'reverted' => __( 'Undone', 'leymish-ai-shopping-readiness' ),
+					'failed'   => __( 'Not applied', 'leymish-ai-shopping-readiness' ),
+					'paused'   => __( 'Paused (no credits)', 'leymish-ai-shopping-readiness' ),
+				),
+				/* translators: %d: number of old suggestions. */
+				'expired'    => __( 'Expired before the new rules (%d)', 'leymish-ai-shopping-readiness' ),
+				'expiredWhy' => __( 'Suggestions written before the attribute rules of 8 October. None of them was applied; your team proposes them again under the new rules.', 'leymish-ai-shopping-readiness' ),
+				'empty_was'  => __( '(empty)', 'leymish-ai-shopping-readiness' ),
+				'nothing'    => __( 'Nothing yet.', 'leymish-ai-shopping-readiness' ),
+				'unknownBy'  => __( 'not recorded', 'leymish-ai-shopping-readiness' ),
 			),
 		);
 	}

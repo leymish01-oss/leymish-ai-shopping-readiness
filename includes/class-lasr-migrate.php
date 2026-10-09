@@ -22,6 +22,7 @@ class LASR_Migrate {
 
 	const VERSION_OPT = 'lasr_db_version';
 	const NOTICE      = 'lasr_migrated_notice';
+	const SEEN        = 'lasr_migrated_seen';
 	const OLD         = array(
 		'leymish-ai-shopping-readiness-pro.php' => 'LeyMish AI Readiness Pro',
 		'leymish-store-team.php'                => 'LeyMish Store Team',
@@ -103,6 +104,7 @@ class LASR_Migrate {
 				$names[] = self::OLD[ basename( $b ) ];
 			}
 			update_option( self::NOTICE, $names, false );
+			delete_option( self::SEEN );
 		}
 		update_option( self::VERSION_OPT, LASR_VERSION, false );
 		if ( LASR_Feeds::enabled() ) {
@@ -115,17 +117,63 @@ class LASR_Migrate {
 	}
 
 	/**
-	 * One notice, on the Plugins screen and our own screen only.
+	 * Old add-ons still installed (active or not), by basename.
+	 *
+	 * @return string[]
+	 */
+	public static function installed_old() {
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+		$out = array();
+		foreach ( array_keys( (array) get_plugins() ) as $file ) {
+			if ( isset( self::OLD[ basename( (string) $file ) ] ) ) {
+				$out[] = (string) $file;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Where the notice may show (pure, 2.0.1): once on Plugins and once on our Overview tab, never on other tabs.
+	 *
+	 * @param string   $screen_id Current screen.
+	 * @param string   $tab       Our tab ('' on other screens).
+	 * @param string[] $seen      Places it has already shown.
+	 * @return string The place ('plugins' or 'overview'), or '' to stay quiet.
+	 */
+	public static function place( $screen_id, $tab, array $seen ) {
+		$place = '';
+		if ( 'plugins' === $screen_id ) {
+			$place = 'plugins';
+		} elseif ( false !== strpos( (string) $screen_id, LASR_Admin::SLUG ) && 'overview' === $tab ) {
+			$place = 'overview';
+		}
+		return '' !== $place && ! in_array( $place, $seen, true ) ? $place : '';
+	}
+
+	/**
+	 * One notice: once on the Plugins screen and once on our Overview (2.0.1). Dismissed means gone; deleting the old
+	 * plugins removes it too.
 	 */
 	public static function notice() {
 		$names = get_option( self::NOTICE );
 		if ( ! $names || ! current_user_can( 'activate_plugins' ) ) {
 			return;
 		}
-		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
-		if ( ! $screen || ( 'plugins' !== $screen->id && false === strpos( (string) $screen->id, LASR_Admin::SLUG ) ) ) {
+		if ( ! self::installed_old() ) {
+			delete_option( self::NOTICE );
+			delete_option( self::SEEN );
 			return;
 		}
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		$seen   = (array) get_option( self::SEEN, array() );
+		$place  = $screen ? self::place( (string) $screen->id, LASR_Admin::tab(), $seen ) : '';
+		if ( '' === $place ) {
+			return;
+		}
+		$seen[] = $place;
+		update_option( self::SEEN, $seen, false );
 		$dismiss = wp_nonce_url( admin_url( 'admin-post.php?action=lasr_dismiss_migrated' ), 'lasr_dismiss_migrated' );
 		echo '<div class="notice notice-success lasr-migrated"><p><strong>' . esc_html__( 'Pro and Store Team are now built into LeyMish AI Readiness.', 'leymish-ai-shopping-readiness' ) . '</strong> ';
 		/* translators: %s: names of the old plugins. */
@@ -142,7 +190,8 @@ class LASR_Migrate {
 		}
 		check_admin_referer( 'lasr_dismiss_migrated' );
 		delete_option( self::NOTICE );
-		wp_safe_redirect( admin_url( 'plugins.php' ) );
+		delete_option( self::SEEN );
+		wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url( 'plugins.php' ) );
 		exit;
 	}
 }

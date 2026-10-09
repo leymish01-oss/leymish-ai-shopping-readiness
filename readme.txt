@@ -4,7 +4,7 @@ Tags: gtin, chatgpt, ai shopping, product feed, structured data
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.0.0
+Stable tag: 2.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -100,6 +100,18 @@ Some optional features use the LeyMish service at https://leymish-ai.leymish.wor
 The "try it on a sample store" link opens WordPress Playground (https://playground.wordpress.net), a service run by the WordPress project that builds a throwaway WordPress in your own browser. It is an ordinary link: following it sends nothing about your site.
 
 == Changelog ==
+
+= 2.0.1 =
+* Fixed: a valid LeyMish Pro licence could be refused by AI visibility, AI fixes and outside monitoring. When a licence really isn't active, the message now says so plainly and points to Plan.
+* Overview starts from your earliest real score (including earlier work by LeyMish agents), and the chart shows those points too.
+* "What changed this week" lists what really happened: settings you switched on or off, audit score changes and Store Team approvals.
+* An area at 100% always says Good. When a few products still have a gap, the card names them, says what's missing and gives a Fix it button.
+* Items nobody can act on yet (UCP checkout for WooCommerce) are shown as "Next to watch", never as your biggest win.
+* New free check: WooCommerce's sample "Refund and Returns Policy" page is not published (its 30-day text can contradict your real policy).
+* AI visibility questions are drafted from your products (types and key ingredients) with one brand question, mixing "best" and "where to buy". Names with & show correctly.
+* Store Team history shows the old value, who approved each change and when, and folds old expired suggestions into one line.
+* Pages no longer stall half-drawn on slow hosts: what the page needs from LeyMish is fetched before it starts, with short timeouts.
+* The "now built in" notice shows once on Plugins and once on Overview, and goes away when the old plugins are deleted.
 
 = 2.0.0 =
 * One plugin, one menu: **LeyMish** sits right after WooCommerce with eight tabs (Overview, Audit, Products, Feeds, AI visibility, AI fixes, Team, Plan). Every tab opens with what's wrong, what we fixed and what to do next.
