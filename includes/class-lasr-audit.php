@@ -35,6 +35,7 @@ class LASR_Audit {
 		'guest'     => 3,
 		'ucp'       => 2,
 		'returns'   => 2,
+		'checkout'  => 3,
 	);
 
 	/**
@@ -46,6 +47,9 @@ class LASR_Audit {
 		$catalog = self::catalog();
 		$sample  = self::sample_product_urls( 3 );
 		$pages   = self::fetch_pages( $sample );
+		if ( class_exists( 'LASR_Ucp' ) ) {
+			LASR_Ucp::detect( $pages ); // 2.1: does the theme or another plugin already say this? Then we don't repeat it.
+		}
 
 		$checks = array(
 			$catalog['check'],
@@ -58,6 +62,8 @@ class LASR_Audit {
 			self::check_llms_txt(),
 			self::check_guest_checkout(),
 			self::check_returns_page(),
+			self::check_checkout(),
+			self::check_links(),
 			self::check_ucp(),
 			self::check_acp(),
 			self::check_mcp(),
@@ -526,6 +532,42 @@ class LASR_Audit {
 				? sprintf( __( 'Set the sample page to draft (Pages → edit it → Switch to draft). Then point WooCommerce\'s refund page setting and your footer or menu links at your real policy, "%1$s" (%2$s).', 'leymish-ai-shopping-readiness' ), wp_specialchars_decode( $real->post_title, ENT_QUOTES ), get_permalink( $real ) )
 				: __( 'Replace the sample text with your real returns policy, or set the page to draft (Pages → edit it → Switch to draft).', 'leymish-ai-shopping-readiness' ),
 			1
+		);
+	}
+
+	/**
+	 * Free check (2.1): the store can take an order (payment method, cart and checkout pages, shipping, no test mode,
+	 * no competing card forms). Local only.
+	 *
+	 * @return array
+	 */
+	private static function check_checkout() {
+		$label = __( 'The store can take an order', 'leymish-ai-shopping-readiness' );
+		$items = class_exists( 'LASR_Health' ) ? LASR_Health::checkout() : array();
+		if ( ! $items ) {
+			return self::check( 'checkout', $label, 'pass', 1, __( 'A payment method is on, the cart and checkout pages are published, and shipping can be quoted.', 'leymish-ai-shopping-readiness' ), '', 1 );
+		}
+		$fail = 'fail' === $items[0]['level'];
+		return self::check( 'checkout', $label, $fail ? 'fail' : 'warn', $fail ? 0 : 0.5, implode( ' ', wp_list_pluck( $items, 'title' ) ), implode( ' ', wp_list_pluck( $items, 'fix' ) ), 1 );
+	}
+
+	/**
+	 * Information (2.1, not scored): products no post or page links to, and links to products that are gone.
+	 *
+	 * @return array
+	 */
+	private static function check_links() {
+		$r = class_exists( 'LASR_Health' ) ? LASR_Health::links() : array( 'orphans' => array(), 'broken' => array(), 'posts' => 0 );
+		return array(
+			'id'     => 'links',
+			'label'  => __( 'Internal links to your products', 'leymish-ai-shopping-readiness' ),
+			'status' => 'info',
+			'points' => 0,
+			'earned' => 0,
+			/* translators: 1: products without links, 2: broken links, 3: posts and pages checked. */
+			'detail' => sprintf( __( '%1$d products have no link from your posts and pages; %2$d links point at products that are gone (%3$d posts and pages checked).', 'leymish-ai-shopping-readiness' ), count( $r['orphans'] ), count( $r['broken'] ), (int) $r['posts'] ),
+			'fix'    => __( 'See "Store health" below the checks: the posts that already name a product are listed first.', 'leymish-ai-shopping-readiness' ),
+			'effort' => 1,
 		);
 	}
 

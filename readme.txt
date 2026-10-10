@@ -4,7 +4,7 @@ Tags: gtin, chatgpt, ai shopping, product feed, structured data
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.0.1
+Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -32,6 +32,18 @@ Shoppers now ask AI assistants what to buy. ChatGPT, Google and Perplexity match
 
 Pro is a service: the licence only unlocks calls to LeyMish's service. Nothing that runs on your site is locked. Upgrading takes a minute: the Plan tab opens checkout and switches Pro on by itself when the purchase arrives.
 
+= Getting started (about 15 minutes, free) =
+
+1. Install and activate the plugin. A **LeyMish** menu appears right after WooCommerce. "Start here" in its header opens this guide inside WordPress, with a tick on each step you've done.
+2. LeyMish → Overview → **Run the audit** (about a minute).
+3. Read your score and "Your next 3 wins": each win shows the points it adds and a Fix it button.
+4. LeyMish → Products: **Set brand for all**, use each SKU as the MPN (only if you make the products), or import **GTINs from a supplier CSV**. Open **See it the way AI sees it**: red fields turn green as you fix them.
+5. LeyMish → Feeds: switch on the OpenAI and Google feeds, llms.txt, the UCP profile and product schema, and set your real return policy.
+6. LeyMish → Overview → **Run the audit again** to see your score change.
+7. Keep LeyMish → Plan → **Weekly email** on: your site re-checks itself every week.
+
+The full guide with flowcharts (free, Pro, done for you, the weekly routine): https://www.leymish.com/woocommerce/start/
+
 = Updating from Pro or Store Team =
 
 LeyMish AI Readiness Pro and LeyMish Store Team are now built in. When you update, your licence, settings, Store Team connection, feeds and history move over, the old plugins are switched off, and you can delete them.
@@ -45,6 +57,10 @@ LeyMish AI Readiness Pro and LeyMish Store Team are now built in. When you updat
 Developers can also run `wp lasr audit` (add `--format=json` for machine-readable output).
 
 == Frequently Asked Questions ==
+
+= Does it count my visitors? =
+
+Yes, on your own site and without cookies (Overview → Visitors): page views, unique visitors per day, where they came from (AI assistants such as ChatGPT or Perplexity, search, other sites, direct) and your top landing pages. To count unique visitors it keeps a one-way hash of the visitor's IP address and browser name, made with a random value that changes every day, for at most two days; the IP address and browser name are never stored, and staff and known bots aren't counted. The counts stay on your site, unless you connect Store Team, which can then read them. You can turn counting off on the Overview card. WordPress → Settings → Privacy offers suggested text for your privacy policy.
 
 = Is it really free? =
 
@@ -94,12 +110,22 @@ Some optional features use the LeyMish service at https://leymish-ai.leymish.wor
 * **AI visibility** (/v1/visibility/check): when you tick the box and run a check, and weekly on Pro. Sends your questions, your store's name and address. LeyMish asks a search-grounded AI model through OpenRouter (https://openrouter.ai, privacy https://openrouter.ai/privacy) and returns which sites are cited. Questions and answers are not stored by LeyMish; the results are kept on your site.
 * **AI fixes** (/v1/fix, /v1/usage): only after you tick the consent box, and only for the product you click. Sends that product's name, descriptions, attributes, categories and main image address. LeyMish asks Anthropic's Claude (https://www.anthropic.com, privacy https://www.anthropic.com/legal/privacy) for a draft. No customer or order data is sent; LeyMish keeps counters, not product text.
 * **Outside monitoring** (/v1/monitor): weekly, on Pro only. Sends your store's address; LeyMish then requests your home page, robots.txt, product API, llms.txt, feeds and UCP profile from outside, including as AI crawlers would, at most once a day.
-* **Store Team** (/v1/team/...): only after you click "Connect" and approve on WooCommerce's own screen. WooCommerce sends LeyMish a REST API key for your store, stored encrypted; the agents read your catalogue and propose changes, and nothing is written without your approval. The live demo loads public data about our partner store only when you click "Show the live demo". Disconnect deletes LeyMish's copy of the key.
+* **Store Team** (/v1/team/...): only after you click "Connect" and approve on WooCommerce's own screen. WooCommerce sends LeyMish a REST API key for your store, stored encrypted; once connected, the agents can also read your visitor counts from this plugin (counts only, never IP addresses); the agents read your catalogue, your completed orders of the last 90 days (to find products bought together and orders ready for a review request) and recent product reviews (so no one who already reviewed is asked), use them for that run without keeping them, and propose changes; nothing is written without your approval. A review request you approve is sent by your own store as a WooCommerce order note, and none is proposed while another plugin already sends review requests. The live demo loads public data about our partner store only when you click "Show the live demo". Disconnect deletes LeyMish's copy of the key.
 * **The weekly store tip** (/v1/check/subscribe, optional, off by default): only when you tick the box, enter an email address and submit. Sends that address, your site's domain and your consent. Every email has an unsubscribe link, and unsubscribing deletes the record.
 
 The "try it on a sample store" link opens WordPress Playground (https://playground.wordpress.net), a service run by the WordPress project that builds a throwaway WordPress in your own browser. It is an ordinary link: following it sends nothing about your site.
 
 == Changelog ==
+
+= 2.1.0 =
+* New, free: **Visitors** on Overview. Cookieless, first-party counts on your own site: visitors yesterday and in 7 days, how many came from AI assistants, search, other sites or directly, and your top landing pages.
+* New: **Start here**. The start guide inside WordPress, trimmed to your plan, with a tick on each step that's really done; a "15-minute start" card on Overview until the first audit and fix.
+* New free check: **the store can take an order**: a payment method is on, the cart and checkout pages are published, shipping can be quoted, no payment method is left in test mode, and two card forms don't compete at checkout.
+* New: **internal links to your products** (Audit → Store health): products no post or page links to, the posts that already name them, and links to products that are gone.
+* Product schema no longer repeats what your theme or another plugin already says: if a return policy or shipping details are already on your product pages, LeyMish doesn't add a second one (the Feeds tab says so).
+* Store Team: once a day the plugin sends your visitor counts (counts only) so the store report can include them; choose a weekly (Monday) or daily report on the Team tab.
+* Store Team: a monthly sales goal on the Team tab, shown against the sales WooCommerce has recorded this month (no forecasts). New proposals, each waiting for your approval: cross-sells from products really bought together, a link to a product no other product page links to, and one honest review request per order 7 to 30 days after it completes (no reward, any rating welcome).
+* AI visibility: a used weekly allowance now shows as a notice ("they reset on Monday"), not an error.
 
 = 2.0.1 =
 * Fixed: a valid LeyMish Pro licence could be refused by AI visibility, AI fixes and outside monitoring. When a licence really isn't active, the message now says so plainly and points to Plan.

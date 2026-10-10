@@ -46,9 +46,9 @@ class LASR_Dashboard {
 	public static function category_map() {
 		return array(
 			'access'   => array( __( 'Access', 'leymish-ai-shopping-readiness' ), __( 'Robots, crawlers and what they receive', 'leymish-ai-shopping-readiness' ), array( 'public', 'robots', 'bot_block', 'no_js', 'llms_txt' ) ),
-			'product'  => array( __( 'Product data', 'leymish-ai-shopping-readiness' ), __( 'GTIN, brand, attributes, images and structured data', 'leymish-ai-shopping-readiness' ), array( 'catalog', 'jsonld' ) ),
+			'product'  => array( __( 'Product data', 'leymish-ai-shopping-readiness' ), __( 'GTIN, brand, attributes, images and structured data', 'leymish-ai-shopping-readiness' ), array( 'catalog', 'jsonld', 'links' ) ),
 			'api'      => array( __( 'Store API', 'leymish-ai-shopping-readiness' ), __( 'The product feed apps and agents read', 'leymish-ai-shopping-readiness' ), array( 'store_api' ) ),
-			'checkout' => array( __( 'AI checkout readiness', 'leymish-ai-shopping-readiness' ), __( 'Guest checkout, returns policy, UCP and ACP', 'leymish-ai-shopping-readiness' ), array( 'guest', 'returns', 'ucp', 'acp', 'mcp' ) ),
+			'checkout' => array( __( 'AI checkout readiness', 'leymish-ai-shopping-readiness' ), __( 'Guest checkout, returns policy, UCP and ACP', 'leymish-ai-shopping-readiness' ), array( 'guest', 'checkout', 'returns', 'ucp', 'acp', 'mcp' ) ),
 		);
 	}
 
@@ -297,6 +297,7 @@ class LASR_Dashboard {
 			'jsonld'   => 'products',
 			'llms_txt' => 'feeds',
 			'ucp'      => 'feeds',
+			'links'    => 'audit',
 		);
 		if ( isset( $tabs[ $id ] ) && class_exists( 'LASR_Admin' ) ) {
 			return admin_url( 'admin.php?page=' . LASR_Admin::SLUG . '&tab=' . $tabs[ $id ] );

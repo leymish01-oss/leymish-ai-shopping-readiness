@@ -193,6 +193,21 @@ class LASR_Plan {
 		}
 		echo '</tbody></table></section></div>';
 
+		// P-031 §3: the weekly loop, in the start guide's words. Measured results only; no promise of sales.
+		$loop = array(
+			array( __( 'Measure', 'leymish-ai-shopping-readiness' ), __( 'Score, product gaps, AI citations, visitors, Google clicks, orders.', 'leymish-ai-shopping-readiness' ) ),
+			array( __( 'Plan', 'leymish-ai-shopping-readiness' ), __( 'The CEO agent picks this week\'s three biggest gaps against your sales goal.', 'leymish-ai-shopping-readiness' ) ),
+			array( __( 'Draft', 'leymish-ai-shopping-readiness' ), __( 'Product data, titles and FAQs from real searches, cross-sells, links, review requests.', 'leymish-ai-shopping-readiness' ) ),
+			array( __( 'Approve', 'leymish-ai-shopping-readiness' ), __( 'You approve, edit or reject each change in LeyMish → Team.', 'leymish-ai-shopping-readiness' ) ),
+			array( __( 'Apply', 'leymish-ai-shopping-readiness' ), __( 'Approved changes go live, each with an undo.', 'leymish-ai-shopping-readiness' ) ),
+			array( __( 'Report', 'leymish-ai-shopping-readiness' ), __( 'Visitors, clicks, AI citations, orders and what changed, by email. Then again.', 'leymish-ai-shopping-readiness' ) ),
+		);
+		echo '<h2>' . esc_html__( 'One weekly loop: more stores find you, more visitors buy', 'leymish-ai-shopping-readiness' ) . '</h2><ol class="lasr-loop">';
+		foreach ( $loop as $step ) {
+			echo '<li><strong>' . esc_html( $step[0] ) . '</strong><span>' . esc_html( $step[1] ) . '</span></li>';
+		}
+		echo '</ol><p class="description">' . esc_html__( 'Free measures; Pro and Store Team work the loop every week. We don\'t promise more sales: every number in the report is measured on your store.', 'leymish-ai-shopping-readiness' ) . '</p>';
+
 		echo '<h2>' . esc_html__( 'Licence', 'leymish-ai-shopping-readiness' ) . '</h2><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="lasr-card-box">';
 		wp_nonce_field( 'lasr_license' );
 		echo '<input type="hidden" name="action" value="lasr_license" />';

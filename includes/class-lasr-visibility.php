@@ -232,6 +232,9 @@ class LASR_Visibility {
 			self::back( 'consent' );
 		}
 		$r = self::run();
+		if ( ! $r['ok'] && false !== stripos( $r['error'], 'questions are used' ) ) {
+			self::back( 'allowance' ); // P-029: a used weekly allowance is news, not an error
+		}
 		self::back( $r['ok'] ? 'done' : 'failed', $r['ok'] ? '' : $r['error'] );
 	}
 
@@ -442,6 +445,7 @@ class LASR_Visibility {
 		$texts = array(
 			'saved'   => array( 'success', __( 'Questions saved.', 'leymish-ai-shopping-readiness' ) ),
 			'done'    => array( 'success', __( 'Check finished.', 'leymish-ai-shopping-readiness' ) ),
+			'allowance' => array( 'info', __( 'This week\'s 10 questions are used; they reset on Monday.', 'leymish-ai-shopping-readiness' ) ),
 			'consent' => array( 'warning', __( 'Tick the box first: the questions and your store\'s address are sent to LeyMish for this check.', 'leymish-ai-shopping-readiness' ) ),
 		);
 		if ( 'failed' === $msg ) {

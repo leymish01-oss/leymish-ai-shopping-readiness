@@ -277,3 +277,14 @@ input.lasr-gtin[aria-invalid="true"] { border-color: #d63638; box-shadow: 0 0 0 
 .lasr-dot-imported { fill: #fff; stroke: var(--lasr-accent); stroke-width: 2; }
 .lst-table-wrap { overflow-x: auto; }
 .lst-expired td { color: var(--lasr-muted); }
+/* 2.1 */
+.lasr-start-link { margin-left: auto; margin-right: 12px; font-weight: 600; }
+.lasr-start-steps { list-style: none; margin: 0 0 20px; padding: 0; counter-reset: s; }
+.lasr-start-steps li { position: relative; padding: 10px 12px 10px 44px; border: 1px solid var(--lasr-line, #dcdcde); border-radius: 10px; margin: 8px 0; background: #fff; }
+.lasr-start-mark { position: absolute; left: 12px; top: 10px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #8c8f94; text-align: center; line-height: 18px; font-weight: 700; }
+.lasr-start-steps li.is-done .lasr-start-mark { background: #1f6f4a; border-color: #1f6f4a; color: #fff; }
+.lasr-visitors .lasr-kpis { display: flex; flex-wrap: wrap; gap: 18px; list-style: none; margin: 0 0 8px; padding: 0; }
+/* P-031: weekly loop on the Plan tab */
+.lasr-loop{list-style:none;margin:8px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;counter-reset:l}.lasr-loop li{counter-increment:l;background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;position:relative}.lasr-loop li strong::before{content:counter(l) ". ";color:#1f6f4a}.lasr-loop li span{color:#50575e;font-size:13px}.lasr-loop li:last-child::after{content:"\21BA";position:absolute;top:8px;right:10px;color:#1f6f4a}
+/* Store Team crew cards with the agents' 3D avatars */
+.lst-crew{list-style:none;margin:10px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.lst-member{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid #dcdcde;border-radius:10px;padding:12px;opacity:.75}.lst-member.is-hired{opacity:1;border-color:#1f6f4a}.lst-member img{width:72px;height:72px;border-radius:16px;flex:none;object-fit:cover;background:#dcefed}.lst-member strong{display:block;font-size:15px}.lst-member p{margin:4px 0}.lst-title{display:block;color:#1f6f4a;font-size:12px;font-weight:600}.lst-skills,.lst-status{display:block;color:#50575e;font-size:12px}.lst-status{margin-top:2px;font-weight:600}

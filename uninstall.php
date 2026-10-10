@@ -41,6 +41,13 @@ foreach ( array(
 	'lasr_migrated_seen',
 	'lasr_pro_status_last',
 	'lasr_earlier_last',
+	'lasr_visits',
+	'lasr_visits_salt',
+	'lasr_team_report',
+	'lasr_visitors_enabled',
+	'lasr_schema_provided',
+	'lasr_links',
+	'lasr_start_dismissed',
 ) as $lasr_option ) {
 	delete_option( $lasr_option );
 }

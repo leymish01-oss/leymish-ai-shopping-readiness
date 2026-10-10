@@ -70,6 +70,9 @@ class LASR_Admin {
 		if ( 'impact' === $t ) {
 			$t = 'overview'; // 1.x name
 		}
+		if ( 'start' === $t ) {
+			return 'start'; // the Start here guide: reachable from the header, not a tab of its own
+		}
 		return isset( self::tabs()[ $t ] ) ? $t : 'overview';
 	}
 
@@ -353,6 +356,7 @@ class LASR_Admin {
 		echo '<div class="wrap lasr-wrap">';
 		echo '<header class="lasr-head"><span class="lasr-mark" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M3 2h3.2v12.6H17V18H3z"/><circle cx="14.6" cy="6.2" r="3.2"/></svg></span>';
 		echo '<h1 class="lasr-title"><span class="lasr-wordmark">LeyMish</span> <span class="lasr-sub">' . esc_html__( 'AI Readiness', 'leymish-ai-shopping-readiness' ) . '</span></h1>';
+		echo '<a class="lasr-start-link" href="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG . '&tab=start' ) ) . '">' . esc_html__( 'Start here', 'leymish-ai-shopping-readiness' ) . '</a>';
 		echo '<span class="lasr-plan-pill">' . esc_html( LASR_License::plan_label() ) . '</span></header>';
 		echo '<hr class="wp-header-end">';
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display-only flag set by our own redirect.
@@ -391,6 +395,9 @@ class LASR_Admin {
 			case 'plan':
 				LASR_Plan::render();
 				break;
+			case 'start':
+				LASR_Start::render();
+				break;
 			default:
 				self::render_overview( $result );
 		}
@@ -418,6 +425,7 @@ class LASR_Admin {
 	 * @param array|null $result Last audit.
 	 */
 	private static function render_overview( $result ) {
+		LASR_Start::card();
 		$history  = LASR_Impact::history();
 		$baseline = LASR_Impact::baseline();
 		if ( ! $result || ! $history || ! $baseline ) {
@@ -489,6 +497,7 @@ class LASR_Admin {
 			self::run_form( true );
 		} );
 		LASR_Dashboard::cards( $result['checks'], isset( $result['products'] ) ? (array) $result['products'] : array() );
+		LASR_Visitors::card();
 		if ( self::review_due( $delta ) ) {
 			self::review_box();
 		}
@@ -839,6 +848,7 @@ class LASR_Admin {
 			echo '<tr><th scope="row">' . esc_html( $c['label'] ) . '</th><td class="lasr-col-area">' . esc_html( $a ) . '</td><td>' . wp_kses_post( self::badge( $c['status'] ) ) . '</td><td>' . esc_html( (string) $pts ) . '</td><td>' . esc_html( $c['detail'] ) . $fix . '</td></tr>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $fix is escaped above.
 		}
 		echo '</tbody></table></div>';
+		LASR_Health::render();
 
 		$all = (array) $result['products'];
 		if ( $all ) {
@@ -1030,7 +1040,12 @@ class LASR_Admin {
 		echo '<p class="lasr-inline"><label>' . esc_html__( 'Days to return', 'leymish-ai-shopping-readiness' ) . ' <input type="number" min="0" max="365" name="return_days" value="' . esc_attr( (string) $ucp['return_days'] ) . '" class="small-text" /></label> ';
 		echo '<label>' . esc_html__( 'Return shipping', 'leymish-ai-shopping-readiness' ) . ' <select name="return_fees"><option value="free"' . selected( 'free', $ucp['return_fees'], false ) . '>' . esc_html__( 'free for the customer', 'leymish-ai-shopping-readiness' ) . '</option><option value="customer"' . selected( 'customer', $ucp['return_fees'], false ) . '>' . esc_html__( 'paid by the customer', 'leymish-ai-shopping-readiness' ) . '</option></select></label> ';
 		echo '<label>' . esc_html__( 'How', 'leymish-ai-shopping-readiness' ) . ' <select name="return_how"><option value="mail"' . selected( 'mail', $ucp['return_how'], false ) . '>' . esc_html__( 'by mail', 'leymish-ai-shopping-readiness' ) . '</option><option value="store"' . selected( 'store', $ucp['return_how'], false ) . '>' . esc_html__( 'in store', 'leymish-ai-shopping-readiness' ) . '</option></select></label></p>';
-		echo '<p class="description">' . esc_html__( '0 days means returns are not accepted. Match what your refund and returns page says.', 'leymish-ai-shopping-readiness' ) . '</p></fieldset>';
+		echo '<p class="description">' . esc_html__( '0 days means returns are not accepted. Match what your refund and returns page says.', 'leymish-ai-shopping-readiness' ) . '</p>';
+		$provided = LASR_Ucp::provided();
+		if ( ! empty( $provided['returns'] ) ) {
+			echo '<p class="lasr-note">' . esc_html__( 'Already provided by your theme or another plugin, so we don\'t add a second one. Check that it matches your real policy.', 'leymish-ai-shopping-readiness' ) . '</p>';
+		}
+		echo '</fieldset>';
 		$rates = LASR_Ucp::zone_rates();
 		echo '<fieldset><legend><label><input type="checkbox" name="shipping" value="1" ' . checked( 'yes', $ucp['shipping'], false ) . ' /> ' . esc_html__( 'Shipping cost, from your WooCommerce shipping zones', 'leymish-ai-shopping-readiness' ) . '</label></legend>';
 		if ( $rates ) {

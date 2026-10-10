@@ -3,7 +3,7 @@
  * Plugin Name:          LeyMish AI Readiness
  * Plugin URI:           https://www.leymish.com/woocommerce/
  * Description:          Can ChatGPT, Google and Perplexity find, read and trust your WooCommerce products? A 0–100 audit, a products editor with one-click fixes, OpenAI and Google feeds, llms.txt, a UCP profile and richer product schema, all running on your site, free. Optional LeyMish Pro services: AI visibility checks, AI fixes you approve, outside monitoring and the Store Team agents.
- * Version:              2.0.1
+ * Version:              2.1.0
  * Requires at least:    6.4
  * Requires PHP:         7.4
  * Requires Plugins:     woocommerce
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'LASR_VERSION', '2.0.1' );
+define( 'LASR_VERSION', '2.1.0' );
 define( 'LASR_FILE', __FILE__ );
 define( 'LASR_DIR', plugin_dir_path( __FILE__ ) );
 
@@ -45,7 +45,7 @@ function lasr_activate() {
  * Remove scheduled jobs and our addresses.
  */
 function lasr_deactivate() {
-	foreach ( array( 'lasr_weekly', 'lasr_license_recheck', 'lasr_rebuild_feeds', 'lasr_visibility_weekly' ) as $hook ) {
+	foreach ( array( 'lasr_weekly', 'lasr_license_recheck', 'lasr_rebuild_feeds', 'lasr_visibility_weekly', 'lasr_visitors_push' ) as $hook ) {
 		wp_clear_scheduled_hook( $hook );
 	}
 	flush_rewrite_rules();
@@ -76,7 +76,7 @@ function lasr_boot() {
 		add_action( 'admin_notices', 'lasr_notice_needs_woocommerce' );
 		return;
 	}
-	foreach ( array( 'service', 'audit', 'impact', 'license', 'feeds', 'llms', 'ucp', 'worklog', 'schedule', 'visibility', 'team', 'migrate' ) as $part ) {
+	foreach ( array( 'service', 'audit', 'impact', 'license', 'feeds', 'llms', 'ucp', 'worklog', 'schedule', 'visibility', 'team', 'migrate', 'visitors', 'health' ) as $part ) {
 		require_once LASR_DIR . 'includes/class-lasr-' . $part . '.php';
 	}
 	LASR_Impact::init(); // records a snapshot after every audit, including WP-CLI and the weekly run
@@ -87,8 +87,9 @@ function lasr_boot() {
 	LASR_Schedule::init();
 	LASR_Visibility::init();
 	LASR_Migrate::init();
+	LASR_Visitors::init();
 	if ( is_admin() ) {
-		foreach ( array( 'admin', 'dashboard', 'onboarding', 'products', 'ai-logic', 'ai', 'plan' ) as $part ) {
+		foreach ( array( 'admin', 'dashboard', 'onboarding', 'products', 'ai-logic', 'ai', 'plan', 'start' ) as $part ) {
 			require_once LASR_DIR . 'includes/class-lasr-' . $part . '.php';
 		}
 		LASR_Admin::init();
@@ -96,6 +97,7 @@ function lasr_boot() {
 		LASR_AI::init();
 		LASR_Team::init();
 		LASR_Plan::init();
+		LASR_Start::init();
 		LASR_Worklog::init();
 	}
 	if ( defined( 'WP_CLI' ) && WP_CLI ) {

@@ -31,6 +31,8 @@ class LASR_Team {
 		add_action( 'admin_post_lasr_team_connect', array( __CLASS__, 'handle_connect' ) );
 		add_action( 'admin_post_lasr_team_disconnect', array( __CLASS__, 'handle_disconnect' ) );
 		add_action( 'admin_post_lasr_team_beta', array( __CLASS__, 'handle_beta' ) );
+		add_action( 'admin_post_lasr_team_report', array( __CLASS__, 'handle_report' ) );
+		add_action( 'admin_post_lasr_team_goal', array( __CLASS__, 'handle_goal' ) );
 		add_action( 'wp_ajax_lasr_team_revert', array( __CLASS__, 'ajax_revert' ) );
 		add_action( 'wp_ajax_lasr_approvals', array( __CLASS__, 'ajax_list' ) );
 		add_action( 'wp_ajax_lasr_approvals_decide', array( __CLASS__, 'ajax_decide' ) );
@@ -158,6 +160,37 @@ class LASR_Team {
 		delete_transient( self::COUNT_KEY );
 		delete_transient( LASR_License::STATUS_KEY );
 		self::back( 'disconnected' );
+	}
+
+	/**
+	 * Piku's store report: weekly (Mondays, the default) or daily.
+	 */
+	public static function handle_report() {
+		self::guard( 'lasr_team_report' );
+		$freq = isset( $_POST['frequency'] ) && 'daily' === sanitize_key( wp_unslash( $_POST['frequency'] ) ) ? 'daily' : 'weekly'; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked in guard().
+		$msg  = 'report_failed';
+		if ( self::connection() ) {
+			$r = self::call( 'report', array( 'frequency' => $freq ) );
+			if ( 200 === $r['status'] ) {
+				update_option( 'lasr_team_report', $freq, false );
+				$msg = 'report_ok';
+			}
+		}
+		self::back( $msg );
+	}
+
+	/**
+	 * The owner's monthly sales goal (0 clears it). The Team tab shows recorded WooCommerce sales against it.
+	 */
+	public static function handle_goal() {
+		self::guard( 'lasr_team_goal' );
+		$goal = isset( $_POST['goal_usd'] ) ? absint( wp_unslash( $_POST['goal_usd'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked in guard().
+		$msg  = 'goal_failed';
+		if ( self::connection() ) {
+			$r   = self::call( 'goal', array( 'goal_usd' => $goal ) );
+			$msg = 200 === $r['status'] ? 'goal_ok' : 'goal_failed';
+		}
+		self::back( $msg );
 	}
 
 	/**
@@ -398,6 +431,10 @@ class LASR_Team {
 		$msgs = array(
 			'https'        => __( 'Your store needs https to connect.', 'leymish-ai-shopping-readiness' ),
 			'failed'       => __( 'Couldn\'t start the connection. Try again in a minute.', 'leymish-ai-shopping-readiness' ),
+			'report_ok'     => __( 'Saved. The store report will come at that pace.', 'leymish-ai-shopping-readiness' ),
+			'goal_ok'       => __( 'Goal saved. Recorded sales update once a day.', 'leymish-ai-shopping-readiness' ),
+			'goal_failed'   => __( 'Couldn\'t save the goal. Try again in a minute.', 'leymish-ai-shopping-readiness' ),
+			'report_failed' => __( 'Couldn\'t save the report setting. Try again in a minute.', 'leymish-ai-shopping-readiness' ),
 			'disconnected' => __( 'Disconnected. Also revoke the key in WooCommerce → Settings → Advanced → REST API.', 'leymish-ai-shopping-readiness' ),
 			'beta_ok'      => __( 'You have a founding spot: Store Team and LeyMish Pro are free for 30 days. After that it\'s $12/month only if you choose to continue; nothing is charged automatically.', 'leymish-ai-shopping-readiness' ),
 			'beta_full'    => __( 'All 5 founding spots are taken. Your team keeps working on the free plan.', 'leymish-ai-shopping-readiness' ),
@@ -432,7 +469,7 @@ class LASR_Team {
 				echo '<div class="lst-banner" role="status"><p>' . esc_html__( 'Demo: live data from mishbio.us, our partner store. Connect your store to see yours.', 'leymish-ai-shopping-readiness' ) . '</p></div>';
 			}
 			echo '<h2>' . esc_html__( 'Your team this week', 'leymish-ai-shopping-readiness' ) . '</h2>';
-			echo '<div id="lst-app" data-source="' . esc_attr( $d['source'] ) . '" data-nonce="' . esc_attr( wp_create_nonce( 'lasr_team' ) ) . '" data-ajax="' . esc_url( admin_url( 'admin-ajax.php' ) ) . '"' . ( $conn ? ' data-inbox="#lasr-approvals-h"' : '' ) . '><p>' . esc_html__( 'Loading…', 'leymish-ai-shopping-readiness' ) . '</p></div>';
+			echo '<div id="lst-app" data-source="' . esc_attr( $d['source'] ) . '" data-avatars="' . esc_url( plugins_url( 'assets/agents/', LASR_FILE ) ) . '" data-nonce="' . esc_attr( wp_create_nonce( 'lasr_team' ) ) . '" data-ajax="' . esc_url( admin_url( 'admin-ajax.php' ) ) . '"' . ( $conn ? ' data-inbox="#lasr-approvals-h"' : '' ) . '><p>' . esc_html__( 'Loading…', 'leymish-ai-shopping-readiness' ) . '</p></div>';
 			echo '<script type="application/json" id="lst-data">' . wp_json_encode( $d['data'], JSON_HEX_TAG | JSON_HEX_AMP ) . '</script>';
 		}
 
@@ -451,6 +488,36 @@ class LASR_Team {
 			}
 		}
 		if ( $conn ) {
+			$goal = 'store' === $d['source'] && ! empty( $d['data']['goal'] ) ? $d['data']['goal'] : null;
+			echo '<section class="lasr-card-box lasr-goal" aria-labelledby="lasr-goal-h"><h3 id="lasr-goal-h">' . esc_html__( 'Monthly sales goal', 'leymish-ai-shopping-readiness' ) . '</h3>';
+			if ( $goal ) {
+				echo '<p>' . esc_html(
+					sprintf(
+						/* translators: 1: goal, 2: recorded sales, 3: amount still to go. */
+						__( 'Goal %1$s. Recorded in WooCommerce this month: %2$s. %3$s to go.', 'leymish-ai-shopping-readiness' ),
+						'$' . number_format_i18n( (float) $goal['goal_usd'], 2 ),
+						'$' . number_format_i18n( (float) $goal['recorded_usd'], 2 ),
+						'$' . number_format_i18n( (float) $goal['gap_usd'], 2 )
+					)
+				) . '</p>';
+			}
+			echo '<p class="description">' . esc_html__( 'Your number, compared with the sales WooCommerce has recorded this month. No forecasts.', 'leymish-ai-shopping-readiness' ) . '</p>';
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><p>';
+			wp_nonce_field( 'lasr_team_goal' );
+			echo '<input type="hidden" name="action" value="lasr_team_goal" />';
+			echo '<label for="lasr-goal-usd">' . esc_html__( 'Goal for this month (USD, 0 to clear):', 'leymish-ai-shopping-readiness' ) . '</label> ';
+			echo '<input type="number" min="0" step="1" id="lasr-goal-usd" name="goal_usd" class="small-text" value="' . esc_attr( $goal ? (string) (int) $goal['goal_usd'] : '' ) . '" /> ';
+			submit_button( __( 'Save goal', 'leymish-ai-shopping-readiness' ), 'secondary small', 'submit', false );
+			echo '</p></form></section>';
+			$freq = get_option( 'lasr_team_report', 'weekly' );
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="lasr-report-freq"><p>';
+			wp_nonce_field( 'lasr_team_report' );
+			echo '<input type="hidden" name="action" value="lasr_team_report" />';
+			echo '<label for="lasr-report-frequency">' . esc_html__( 'Store report by email (visitors, changes, what\'s waiting):', 'leymish-ai-shopping-readiness' ) . '</label> ';
+			echo '<select id="lasr-report-frequency" name="frequency"><option value="weekly"' . selected( $freq, 'weekly', false ) . '>' . esc_html__( 'Weekly, on Mondays', 'leymish-ai-shopping-readiness' ) . '</option>';
+			echo '<option value="daily"' . selected( $freq, 'daily', false ) . '>' . esc_html__( 'Daily', 'leymish-ai-shopping-readiness' ) . '</option></select> ';
+			submit_button( __( 'Save', 'leymish-ai-shopping-readiness' ), 'secondary small', 'submit', false );
+			echo '</p></form>';
 			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="lasr-disconnect">';
 			wp_nonce_field( 'lasr_team_disconnect' );
 			echo '<input type="hidden" name="action" value="lasr_team_disconnect" />';

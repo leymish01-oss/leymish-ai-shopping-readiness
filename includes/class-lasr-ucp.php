@@ -159,6 +159,72 @@ class LASR_Ucp {
 	}
 
 	/**
+	 * Which product-schema parts the theme or another plugin already outputs (2.1).
+	 *
+	 * @return array{returns:bool,shipping:bool}
+	 */
+	public static function provided() {
+		$p = get_option( 'lasr_schema_provided' );
+		return array(
+			'returns'  => is_array( $p ) && ! empty( $p['returns'] ),
+			'shipping' => is_array( $p ) && ! empty( $p['shipping'] ),
+		);
+	}
+
+	/**
+	 * How many times a page's JSON-LD states a return policy and shipping details (pure).
+	 *
+	 * @param string $html Page HTML.
+	 * @return array{returns:int,shipping:int}
+	 */
+	public static function count_props( $html ) {
+		$n = array( 'returns' => 0, 'shipping' => 0 );
+		if ( preg_match_all( '#<script[^>]+application/ld\+json[^>]*>(.*?)</script>#is', (string) $html, $m ) ) {
+			foreach ( $m[1] as $block ) {
+				$n['returns']  += substr_count( $block, '"hasMerchantReturnPolicy"' );
+				$n['shipping'] += substr_count( $block, '"shippingDetails"' );
+			}
+		}
+		return $n;
+	}
+
+	/**
+	 * Decide from the audit's product pages whether someone else already provides a part (pure core in decide()).
+	 *
+	 * @param array $pages URL => response (body under 'body').
+	 */
+	public static function detect( array $pages ) {
+		$max = array( 'returns' => 0, 'shipping' => 0 );
+		foreach ( $pages as $res ) {
+			$c = self::count_props( is_array( $res ) && isset( $res['body'] ) ? $res['body'] : '' );
+			foreach ( $max as $k => $v ) {
+				$max[ $k ] = max( $v, $c[ $k ] );
+			}
+		}
+		if ( ! $pages ) {
+			return;
+		}
+		update_option( 'lasr_schema_provided', self::decide( $max, self::settings(), self::provided() ) + array( 't' => time() ), false );
+	}
+
+	/**
+	 * Others provide a part when the page states it more often than we add it (pure).
+	 *
+	 * @param array $counts   Max counts per page (returns, shipping).
+	 * @param array $settings Our settings.
+	 * @param array $before   What we decided last time (when we already stepped aside, every copy is theirs).
+	 * @return array{returns:bool,shipping:bool}
+	 */
+	public static function decide( array $counts, array $settings, array $before ) {
+		$out = array();
+		foreach ( array( 'returns', 'shipping' ) as $k ) {
+			$ours      = 'yes' === ( isset( $settings[ $k ] ) ? $settings[ $k ] : 'no' ) && empty( $before[ $k ] ) ? 1 : 0;
+			$out[ $k ] = ( (int) $counts[ $k ] - $ours ) > 0;
+		}
+		return $out;
+	}
+
+	/**
 	 * Add what's true and missing to WooCommerce's Product JSON-LD.
 	 *
 	 * @param array      $markup  Product markup.
@@ -173,11 +239,12 @@ class LASR_Ucp {
 		if ( 'yes' === $s['identifiers'] && class_exists( 'LASR_Audit' ) ) {
 			$markup = self::add_identifiers( $markup, LASR_Audit::brand( $product ), LASR_Audit::gtin( $product ), LASR_Audit::mpn( $product ) );
 		}
-		$extra = array();
-		if ( 'yes' === $s['returns'] ) {
+		$extra    = array();
+		$provided = self::provided(); // 2.1: never a second copy of what the theme already says
+		if ( 'yes' === $s['returns'] && empty( $provided['returns'] ) ) {
 			$extra['hasMerchantReturnPolicy'] = self::return_policy( $s, self::base_country() );
 		}
-		if ( 'yes' === $s['shipping'] ) {
+		if ( 'yes' === $s['shipping'] && empty( $provided['shipping'] ) ) {
 			$ship = self::shipping_details( self::zone_rates(), $s, get_woocommerce_currency() );
 			if ( $ship ) {
 				$extra['shippingDetails'] = $ship;

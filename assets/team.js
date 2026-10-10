@@ -29,7 +29,8 @@
     ]);
   }
   var agentName = {};
-  (d.team || []).forEach(function (a) { agentName[a.id] = a.name; });
+  var avatars = app.getAttribute("data-avatars") || ""; // the plugin's own images, never remote
+  (d.team || []).forEach(function (a) { agentName[a.id] = a.nick ? a.nick + " (" + a.name + ")" : a.name; });
   var name = function (id) { return agentName[id] || id; };
 
   var sections = {
@@ -54,9 +55,20 @@
     }],
     team: ["Team", function () {
       return [el("p", { cls: "description", text: "Who's hired for this store, what each one does and what it may touch." }),
-        table(["Agent", "Role", "Skills", "Status"], (d.team || []).map(function (a) {
-          return [a.name, a.role, (a.skills || []).join(", "), a.hired ? "Hired" : a.available ? "Available on your plan" : "On a higher plan"];
-        }))];
+        el("ul", { cls: "lst-crew" }, (d.team || []).map(function (a) {
+          var status = a.hired ? "Hired" : a.available ? "Available on your plan" : "On a higher plan";
+          return el("li", { cls: "lst-member" + (a.hired ? " is-hired" : "") }, [
+            avatars && /^[a-z]+$/.test(a.id) ? el("img", { src: avatars + a.id + ".webp", alt: "", width: "96", height: "96", loading: "lazy" }) : null,
+            el("div", {}, [
+              el("strong", { text: a.nick || a.name }),
+              el("span", { cls: "lst-title", text: (a.title || "AI agent") + " · " + a.name }),
+              el("p", { text: a.role }),
+              el("span", { cls: "lst-skills", text: (a.skills || []).join(", ") }),
+              el("span", { cls: "lst-status", text: status }),
+            ]),
+          ]);
+        })),
+        el("p", { cls: "description", text: "They're AI agents, not people: friendly names, real work, and every change waits for your approval." })];
     }],
     plan: ["Weekly plan", function () {
       var p = d.plan;
