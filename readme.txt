@@ -4,7 +4,7 @@ Tags: gtin, chatgpt, ai shopping, product feed, structured data
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.0
+Stable tag: 2.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -103,7 +103,7 @@ The first 500 published products. Developers can change this with the `lasr_prod
 
 The audit, the Products tab, the feeds, llms.txt, the UCP profile, product schema, the weekly re-audit and the report run entirely on your own server. They make no requests except to your own store's pages.
 
-Some optional features use the LeyMish service at https://leymish-ai.leymish.workers.dev, run by LeyMish Labs (14 Jenkins St, Rosewater SA 5013, Australia). Terms: https://www.leymish.com/terms.html. Privacy: https://www.leymish.com/privacy.html. Nothing is sent on activation, on an audit or on a plain page view: each call below happens only after you act, and says so on screen.
+Some optional features use the LeyMish service at https://leymish-ai.leymish.workers.dev, run by LeyMish Labs (South Australia; contact hello@leymish.com). Terms: https://www.leymish.com/terms.html. Privacy: https://www.leymish.com/privacy.html. Nothing is sent on activation, on an audit or on a plain page view: each call below happens only after you act, and says so on screen.
 
 * **Licence check** (/v1/license/check, /v1/pro/status): when you activate a LeyMish Pro licence, and weekly while one is active. Sends the licence key and your store's address. LeyMish checks the key with its payment provider (Gumroad).
 * **One-click upgrade** (/v1/claim/start, /v1/claim/poll): when you click "Upgrade", and while that tab waits for your purchase. Sends your store's address; checkout opens at Gumroad (https://gumroad.com, terms https://gumroad.com/terms, privacy https://gumroad.com/privacy) with a one-time claim ID, so the new licence can be matched to your store.
@@ -116,6 +116,9 @@ Some optional features use the LeyMish service at https://leymish-ai.leymish.wor
 The "try it on a sample store" link opens WordPress Playground (https://playground.wordpress.net), a service run by the WordPress project that builds a throwaway WordPress in your own browser. It is an ordinary link: following it sends nothing about your site.
 
 == Changelog ==
+
+= 2.1.1 =
+* Readme: contact details updated. No code changes.
 
 = 2.1.0 =
 * New, free: **Visitors** on Overview. Cookieless, first-party counts on your own site: visitors yesterday and in 7 days, how many came from AI assistants, search, other sites or directly, and your top landing pages.
